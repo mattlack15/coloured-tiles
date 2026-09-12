@@ -37,6 +37,13 @@ namespace Jam
         public TileParticipant Participant;
         public NpcTraits Traits;
         public ColorId AssignedColor;
+
+        /// <summary>
+        /// False until the round deals colours. An agent wears plain white before that, so it does
+        /// not advertise a colour it has not been given yet - and so the crowd matches the HUD,
+        /// which reads "waiting" over the same beat.
+        /// </summary>
+        public bool HasAssignedColour;
         public int Id;
         [HideInInspector] public Faller Faller;
 
@@ -73,6 +80,7 @@ namespace Jam
             Faller = faller;
             Id = id;
             AssignedColor = color;
+            HasAssignedColour = false;      // stays white until the round deals colours
             Traits = traits;
             _bodyRenderer = body;
             _line = line;
@@ -102,7 +110,9 @@ namespace Jam
         void ApplyBodyColor()
         {
             if (_bodyRenderer != null)
-                _bodyRenderer.sharedMaterial = Palette.Material(AssignedColor);
+                _bodyRenderer.sharedMaterial = HasAssignedColour
+                    ? Palette.Material(AssignedColor)
+                    : Palette.Unpainted;
             if (_line != null)
                 _line.sharedMaterial = Palette.White;
         }
@@ -115,10 +125,12 @@ namespace Jam
             {
                 // The map deals the colours, so rolling our own would fight it.
                 AssignedColor = (ColorId)Participant.Colour;
+                HasAssignedColour = true;
             }
             else
             {
                 AssignedColor = Palette.NewColorDifferent(AssignedColor, ref _rng);
+                HasAssignedColour = true;
             }
 
             ApplyBodyColor();

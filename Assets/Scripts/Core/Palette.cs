@@ -30,6 +30,7 @@ namespace Jam
         };
 
         static readonly Material[] Opaque = new Material[Count];
+        static Material _unpainted;
         static Material _neutral;
         static Material _white;
         static Material _surface;
@@ -62,6 +63,20 @@ namespace Jam
                     if (_unlitShader == null) _unlitShader = LitShader;
                 }
                 return _unlitShader;
+            }
+        }
+
+        /// <summary>
+        /// Unpainted body: a lit white, matching the crowd's matte shading. Used before a round's
+        /// colours are handed out, so an unassigned body reads as unassigned rather than showing a
+        /// colour it is not actually hunting yet.
+        /// </summary>
+        public static Material Unpainted
+        {
+            get
+            {
+                if (_unpainted == null) _unpainted = Create(Color.white, LitShader);
+                return _unpainted;
             }
         }
 
