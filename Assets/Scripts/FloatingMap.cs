@@ -5,10 +5,9 @@ using UnityEngine;
 public class FloatingMap : MonoBehaviour
 {
     public const string GameTitle = "Colour Me Surprised!";
-    public bool HasStarted { get; private set; }
     public bool IsGameOver => HasStarted && player && player.IsEliminated;
     static bool restartIntoGame;
-    bool gameOverStopped;
+    bool colourHazard;
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetSession() { restartIntoGame = false; }
     public void RestartGame(bool skipTitle)
@@ -16,33 +15,42 @@ public class FloatingMap : MonoBehaviour
         restartIntoGame = skipTitle;
         UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
     }
-    void Update()
-    {
-        if (!IsGameOver || gameOverStopped) return;
-        gameOverStopped = true;
-        StopAllCoroutines();
-        Phase = "Game over";
-        Remaining = 0;
-    }
+    public bool HasStarted { get; private set; }
     [Min(0)] public float initialSeconds = 10;
     [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
     [Min(2)] public float resolveSeconds = 4;
-    [Min(0.01f)] public float fadeSeconds = 1;
+    [Min(.01f)] public float fadeSeconds = 1;
     [Range(3, 4)] public int litTileCount = 4;
+    [Range(0, 15)] public int botCount = 15;
+    [Tooltip("Zero gives a different match each time; another value reproduces a match.")]
+    public int randomSeed;
     public Transform spawnPoint;
     public Renderer[] tiles;
     public Renderer[] platforms;
     public TestPlayer player;
     public string Phase { get; private set; }
     public float Remaining { get; private set; }
+    public bool Revealed { get; private set; }
+    public bool Resolving { get; private set; }
+    public bool GameOver { get; private set; }
+    public int TargetColour => Human ? Human.ColourIndex : -1;
     public int RoundNumber { get; private set; }
-    public int TargetColour { get; private set; }
-    readonly Color black = new Color(.015f,.018f,.025f);
-    readonly Color[] colours = { new Color(.05f,.35f,1), new Color(1,.08f,.12f), new Color(1,.85f,.02f), new Color(.05f,1,.3f) };
+    public TileNavigation Navigation { get; private set; }
+    public IReadOnlyList<TileActor> Actors => actors;
+    public IReadOnlyList<TileBot> Bots => bots;
+    public TileActor Human { get; private set; }
+    public static readonly Color[] Colours = { new Color(.05f,.35f,1), new Color(1,.08f,.12f), new Color(1,.85f,.02f), new Color(.05f,1,.3f) };
+    public static readonly string[] ColourNames = { "BLUE", "RED", "YELLOW", "GREEN" };
+    readonly List<TileActor> actors = new List<TileActor>();
+    readonly List<TileBot> bots = new List<TileBot>();
     readonly List<Material> owned = new List<Material>();
+    readonly List<Vector3> spawns = new List<Vector3>();
+    Material[] tileMaterials, platformMaterials;
     int[] tileColours;
     Transform[] outlines;
+    System.Random random;
+    bool showDebug;
 
     void Awake()
     {
@@ -50,15 +58,44 @@ public class FloatingMap : MonoBehaviour
     }
     void Start()
     {
-        if (!player) player = FindFirstObjectByType<TestPlayer>();
+        if (tiles == null || tiles.Length < 3 || platforms == null || platforms.Length == 0)
+        {
+            Debug.LogError("FloatingMap needs at least three tiles and a starting platform.");
+            enabled = false;
+            return;
+        }
+        random = new System.Random(randomSeed == 0 ? System.Environment.TickCount : randomSeed);
+        tileMaterials = new Material[tiles.Length];
         tileColours = new int[tiles.Length];
-        for (int i = 0; i < tiles.Length; i++) { owned.Add(tiles[i].material); tileColours[i] = -1; }
         var lines = new List<Transform>();
         foreach (Transform child in transform) if (child.name == "Outline") lines.Add(child);
         outlines = lines.ToArray();
-        foreach (var platform in platforms) owned.Add(platform.material);
-        SetPlatform(true);
-        foreach (var tile in tiles) tile.material.color = black;
+        for (int i = 0; i < tiles.Length; i++) { tileMaterials[i] = tiles[i].material; owned.Add(tileMaterials[i]); }
+        platformMaterials = new Material[platforms.Length];
+        for (int i = 0; i < platforms.Length; i++) { platformMaterials[i] = platforms[i].material; owned.Add(platformMaterials[i]); }
+        if (!player) player = FindFirstObjectByType<TestPlayer>();
+        if (player)
+        {
+            Human = player.Actor;
+            Human.Map = this;
+            actors.Add(Human);
+        }
+        string[] names = { "Pip", "Tank", "Scout", "Moss", "Brick", "Dash", "Fern", "Bash", "Wren", "Ash", "Boulder", "Rook", "Clover", "Rocky", "Finch" };
+        for (int i = 0; i < Mathf.Clamp(botCount, 0, 15); i++)
+        {
+            var go = new GameObject(names[i]);
+            go.transform.SetParent(transform);
+            var actor = go.AddComponent<TileActor>();
+            actor.DisplayName = names[i];
+            actor.Map = this;
+            if (player) actor.ConfigureMovement(player.speed, player.jumpHeight, player.launchSpeed, player.launchUpSpeed);
+            actors.Add(actor);
+            var bot = go.AddComponent<TileBot>();
+            bot.Initialize((BotPreset)(i % 3), random);
+            bots.Add(bot);
+        }
+        BuildSpawns();
+        foreach (var tile in tiles) tile.material.color = new Color(.015f,.018f,.025f);
         if (player && spawnPoint) player.Respawn(spawnPoint.position);
         if (restartIntoGame) { restartIntoGame = false; BeginGame(); }
     }
@@ -69,100 +106,180 @@ public class FloatingMap : MonoBehaviour
         if (player) player.ControlsEnabled = true;
         StartCoroutine(Rounds());
     }
-    IEnumerator Countdown(float seconds, bool enforceColour = false)
+    void BuildSpawns()
     {
-        Remaining = seconds;
-        while (Remaining > 0)
+        float y = platforms[0].bounds.max.y + TileActor.Height * .5f + .035f;
+        Vector3 humanSpawn = spawnPoint ? spawnPoint.position : new Vector3(0, y, -6.4f);
+        spawns.Add(humanSpawn);
+        // Alternating sides produces crossing traffic immediately without overlapping spawns.
+        Vector3[] positions = {
+            new Vector3(-3, y, 6.4f), new Vector3(3, y, -6.4f), new Vector3(-6.4f, y, 2.2f),
+            new Vector3(6.4f, y, -2.2f), new Vector3(3, y, 6.4f), new Vector3(-3, y, -6.4f),
+            new Vector3(6.4f, y, 2.2f), new Vector3(-6.4f, y, -2.2f), new Vector3(0, y, 6.4f),
+            new Vector3(-6.4f, y, 0), new Vector3(6.4f, y, 0),
+            new Vector3(-5, y, -6.4f), new Vector3(5, y, -6.4f),
+            new Vector3(-5, y, 6.4f), new Vector3(5, y, 6.4f)
+        };
+        spawns.AddRange(positions);
+    }
+    public void BeginRound()
+    {
+        RoundNumber++;
+        Revealed = Resolving = false;
+        Phase = "All tiles black — get ready";
+        for (int i = 0; i < tiles.Length; i++)
         {
-            if (enforceColour) CheckPlayerColour();
-            yield return null;
-            Remaining = Mathf.Max(0, Remaining - Time.deltaTime);
+            tiles[i].gameObject.SetActive(true);
+            tileMaterials[i].color = new Color(.015f,.018f,.025f);
+            tileColours[i] = -1;
         }
-        if (enforceColour) CheckPlayerColour();
-    }
-    void CheckPlayerColour()
-    {
-        if (!player || player.IsDead || player.IsLaunched) return;
-        int tile = TileUnderPlayer();
-        if (tile >= 0 && tileColours[tile] != TargetColour)
-            player.LaunchOff(transform.position);
-    }
-    void SetPlatform(bool visible)
-    {
-        foreach (var p in platforms)
+        foreach (var line in outlines) line.gameObject.SetActive(true);
+        for (int i = 0; i < platforms.Length; i++)
         {
-            p.gameObject.SetActive(visible);
-            p.GetComponent<Collider>().enabled = visible;
-            var c = p.material.color; c.a = 1; p.material.color = c;
+            platforms[i].gameObject.SetActive(true);
+            platforms[i].GetComponent<Collider>().enabled = true;
+            Color colour = platformMaterials[i].color; colour.a = 1; platformMaterials[i].color = colour;
         }
-    }
-    void Reveal()
-    {
-        var indices = new List<int>();
-        for (int i = 0; i < tiles.Length; i++) { indices.Add(i); tileColours[i] = -1; }
-        int count = Mathf.Min(Mathf.Clamp(litTileCount, 3, 4), tiles.Length);
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < actors.Count; i++)
         {
-            int pick = Random.Range(0, indices.Count), tile = indices[pick];
-            tileColours[tile] = i; tiles[tile].material.color = colours[i]; indices.RemoveAt(pick);
+            if (RoundNumber == 1 || actors[i].IsDead) actors[i].ResetRound(spawns[i]);
+            actors[i].ClearAssignment();
         }
-        TargetColour = Random.Range(0, count);
-        if (player) player.SetTargetColour(colours[TargetColour]);
+        foreach (var bot in bots) bot.ResetRound();
+        Navigation = new TileNavigation(this);
     }
-    // Outlines are separate scene objects, so hide those over missing black tiles too.
+    public void RevealRound()
+    {
+        if (Revealed) return;
+        var shuffledTiles = new List<int>();
+        for (int i = 0; i < tiles.Length; i++) shuffledTiles.Add(i);
+        Shuffle(shuffledTiles);
+        int colourCount = Mathf.Min(Mathf.Clamp(litTileCount, 3, 4), tiles.Length);
+        var order = new List<int>();
+        for (int i = 0; i < actors.Count; i++) if (!actors[i].IsEliminated) order.Add(i);
+        Shuffle(order);
+        var occupancy = new int[colourCount];
+        for (int i = 0; i < colourCount; i++)
+        {
+            tileMaterials[shuffledTiles[i]].color = Colours[i];
+            tileColours[shuffledTiles[i]] = i;
+        }
+        for (int i = 0; i < order.Count; i++)
+        {
+            int colour = i % colourCount;
+            var tile = tiles[shuffledTiles[colour]];
+            int slot = occupancy[colour]++;
+            Vector3 destination = tile.bounds.center;
+            destination.y = tile.bounds.max.y;
+            // Start at opposite corners, leaving space for original-size characters.
+            destination.x += (slot % 2 == 0 ? -.54f : .54f);
+            destination.z += (slot == 0 || slot == 3 ? .54f : -.54f);
+            actors[order[i]].Assign(colour, tile, destination, Colours[colour]);
+        }
+        Revealed = true;
+        Remaining = moveSeconds;
+        Phase = "Match your character to a tile";
+        foreach (var bot in bots) bot.Reveal();
+    }
+    public void DropBlackTiles()
+    {
+        if (Resolving) return;
+        Resolving = true;
+        colourHazard = true;
+        Remaining = 0;
+        Phase = "Black tiles dropped";
+        foreach (var platform in platforms) platform.gameObject.SetActive(false);
+        SetBlackTiles(false);
+    }
     void SetBlackTiles(bool visible)
     {
         for (int i = 0; i < tiles.Length; i++) if (tileColours[i] < 0) tiles[i].gameObject.SetActive(visible);
         foreach (var line in outlines)
         {
-            bool show = true;
-            for (int i = 0; i < tiles.Length; i++)
+            bool show = visible;
+            if (!visible) for (int i = 0; i < tiles.Length; i++)
             {
                 Vector3 d = line.position - tiles[i].transform.position;
-                if (Mathf.Abs(d.x) <= 1.01f && Mathf.Abs(d.z) <= 1.01f) { show = visible || tileColours[i] >= 0; break; }
+                if (Mathf.Abs(d.x) <= 1.01f && Mathf.Abs(d.z) <= 1.01f) { show = tileColours[i] >= 0; break; }
             }
             line.gameObject.SetActive(show);
         }
     }
-    int TileUnderPlayer()
+    public int TileUnderActor(TileActor actor)
     {
-        if (!player || player.IsDead) return -1;
-        // Check the tile below the feet, including a player jumping at judgment time.
-        Vector3 feet = player.Feet;
+        if (actor.IsDead) return -1;
+        Vector3 feet = actor.Feet;
         for (int i = 0; i < tiles.Length; i++)
         {
             if (!tiles[i].gameObject.activeSelf) continue;
             Bounds b = tiles[i].GetComponent<Collider>().bounds;
-            if (feet.x >= b.min.x && feet.x <= b.max.x && feet.z >= b.min.z && feet.z <= b.max.z && feet.y >= b.max.y - .2f && feet.y <= b.max.y + 4)
-                return i;
+            if (feet.x >= b.min.x && feet.x <= b.max.x && feet.z >= b.min.z && feet.z <= b.max.z
+                && feet.y >= b.max.y - .2f && feet.y <= b.max.y + 4) return i;
         }
         return -1;
     }
+    public void JudgeColours()
+    {
+        foreach (var actor in actors)
+        {
+            if (actor.IsDead || actor.IsLaunched) continue;
+            int tile = TileUnderActor(actor);
+            if (tile >= 0 && tileColours[tile] != actor.ColourIndex) actor.LaunchOff(transform.position);
+        }
+        Phase = "Wrong colours launch — survive";
+    }
+    public void FinishRound()
+    {
+        foreach (var actor in actors)
+        {
+            if (actor.IsDead) continue;
+            int tile = TileUnderActor(actor);
+            if (tile < 0) actor.Die("Life lost");
+            else actor.MarkSafe();
+        }
+        if ((Human && Human.IsEliminated) || actors.TrueForAll(a => a.IsEliminated))
+        {
+            GameOver = true;
+            Phase = "Game over";
+            Remaining = 0;
+        }
+    }
+    void Shuffle(List<int> values)
+    {
+        for (int i = values.Count - 1; i > 0; i--)
+        {
+            int j = random.Next(i + 1);
+            int temp = values[i]; values[i] = values[j]; values[j] = temp;
+        }
+    }
+    IEnumerator Countdown(float seconds)
+    {
+        Remaining = seconds;
+        while (Remaining > 0) { yield return null; Remaining = Mathf.Max(0, Remaining - Time.deltaTime); }
+    }
     IEnumerator Rounds()
     {
-        Phase = "All tiles black — get ready";
+        BeginRound();
         yield return Countdown(initialSeconds);
-        while (true)
+        while (!GameOver)
         {
-            if (player && player.IsEliminated) { Phase = "Game over"; Remaining = 0; yield break; }
-            RoundNumber++;
-            SetPlatform(true);
-            if (player && player.IsDead && spawnPoint) player.Respawn(spawnPoint.position);
-            Reveal();
-            Phase = "Match your character to a tile";
+            RevealRound();
             yield return Countdown(moveSeconds);
-            SetPlatform(false);
-            SetBlackTiles(false);
-            Phase = "Black tiles dropped";
-            yield return Countdown(dropSeconds, true);
-            Phase = "Wrong colours launch — survive";
-            yield return Countdown(resolveSeconds, true);
-            // A last-moment wrong-tile entry must finish its launch before the grid resets.
-            while (player && player.IsLaunched && !player.IsDead) yield return null;
-            // Settle anyone still airborne/off-grid before restoring colliders.
-            // This also guarantees no falling player is rescued by a returning black tile.
-            if (player && !player.IsDead && TileUnderPlayer() < 0) player.Die();
-            if (player && player.IsEliminated) { Phase = "Game over"; Remaining = 0; yield break; }
+            DropBlackTiles();
+            yield return Countdown(dropSeconds);
+            JudgeColours();
+            yield return Countdown(resolveSeconds);
+            // Let late launches finish; bound this wait in case wall geometry traps an actor.
+            float launchWait = 0;
+            while (actors.Exists(a => a.IsLaunched && !a.IsDead) && launchWait < 6)
+            {
+                launchWait += Time.deltaTime;
+                yield return null;
+            }
+            foreach (var actor in actors) if (actor.IsLaunched && !actor.IsDead) actor.Die("Wrong colour!");
+            colourHazard = false;
+            FinishRound();
+            if (GameOver) yield break;
             SetBlackTiles(true);
             Phase = "Tiles returning to black";
             float elapsed = 0;
@@ -170,18 +287,57 @@ public class FloatingMap : MonoBehaviour
             {
                 elapsed += Time.deltaTime;
                 for (int i = 0; i < tiles.Length; i++)
-                    tiles[i].material.color = tileColours[i] < 0 ? black : Color.Lerp(colours[tileColours[i]], black, Mathf.Clamp01(elapsed / fadeSeconds));
+                {
+                    Color black = new Color(.015f,.018f,.025f);
+                    tileMaterials[i].color = tileColours[i] < 0 ? black
+                        : Color.Lerp(Colours[tileColours[i]], black, Mathf.Clamp01(elapsed / fadeSeconds));
+                }
                 yield return null;
             }
+            BeginRound();
         }
     }
-    void OnDestroy() { foreach (var m in owned) if (m) Destroy(m); }
+    void Update()
+    {
+        if (IsGameOver && !GameOver)
+        {
+            GameOver = true;
+            colourHazard = false;
+            StopAllCoroutines();
+            Phase = "Game over";
+            Remaining = 0;
+        }
+        if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug;
+        if (Input.GetKeyDown(KeyCode.N)) Remaining = 0;
+    }
+    void LateUpdate()
+    {
+        if (Navigation == null || GameOver || IsGameOver) return;
+        float dt = Time.deltaTime;
+        if (dt <= 0) return;
+        if (player) foreach (var actor in actors)
+            actor.ConfigureMovement(player.speed, player.jumpHeight, player.launchSpeed, player.launchUpSpeed);
+        foreach (var bot in bots) if (bot.isActiveAndEnabled) bot.Tick(dt);
+        foreach (var actor in actors) actor.Step(dt);
+        for (int i = 0; i < actors.Count; i++) for (int j = i + 1; j < actors.Count; j++)
+            TileActor.ResolveContact(actors[i], actors[j], dt);
+        if (colourHazard) JudgeColours();
+    }
     void OnGUI()
     {
         if (!HasStarted || IsGameOver) return;
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
-        GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart game");
+        GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart   N: skip timer");
         if (player) GUI.Label(new Rect(32,116,445,25), "Lives: " + player.LivesRemaining + " / 3");
+        if (!showDebug) return;
+        GUI.Box(new Rect(18,160,470,35 + bots.Count * 23), "BOT DEBUG");
+        for (int i = 0; i < bots.Count; i++)
+        {
+            var actor = bots[i].GetComponent<TileActor>();
+            GUI.Label(new Rect(32,190 + i * 23,445,23), actor.DisplayName + " · " + actor.PersonalityName
+                + " · " + bots[i].State + " · lives " + actor.LivesRemaining);
+        }
     }
+    void OnDestroy() { foreach (var material in owned) if (material) Destroy(material); }
 }
