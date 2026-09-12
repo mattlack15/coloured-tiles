@@ -123,14 +123,7 @@ public sealed class TileNavigation
                 from.links.Add(new Link { to = next, length = Vector3.Distance(from.position, nodes[next].position) });
                 continue;
             }
-            // Only bridge a break in terrain, with a checked landing and jump arc.
-            for (int step = 2; step <= 6; step++)
-            {
-                if (!cells.TryGetValue(cell.Key + direction * step, out next)) continue;
-                if (CanJump(from.position, nodes[next].position))
-                    from.links.Add(new Link { to = next, length = Vector3.Distance(from.position, nodes[next].position), jump = true });
-                break;
-            }
+
         }
     }
     int Nearest(Vector3 p)

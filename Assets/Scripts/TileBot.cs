@@ -17,9 +17,7 @@ public class TileBot : MonoBehaviour
     TileActor actor;
     int waypoint;
     float reactionUntil, replanAt, blockedFor, recoveryUntil, pushUntil, lastRouteDistance;
-    float jumpUntil;
     float progressSinceCheck;
-    Vector3 jumpLanding;
     Vector3 preferredStandingSpot;
     float reconsiderStandingSpotAt;
     int passingSide;
@@ -43,7 +41,7 @@ public class TileBot : MonoBehaviour
         route.Clear();
         waypoint = 0;
         reactionUntil = float.PositiveInfinity;
-        replanAt = blockedFor = recoveryUntil = pushUntil = jumpUntil = 0;
+        replanAt = blockedFor = recoveryUntil = pushUntil = 0;
         progressSinceCheck = 0;
         reconsiderStandingSpotAt = 0;
         recovering = false;
@@ -114,13 +112,6 @@ public class TileBot : MonoBehaviour
         Vector3 position = actor.Feet;
         MakeRoomAtDestination();
         Vector3 targetDelta = Flat(actor.TargetPosition - position);
-        if (Time.time < jumpUntil)
-        {
-            float remaining = Mathf.Max(.08f, jumpUntil - Time.time);
-            actor.SetInput(Flat(jumpLanding - position) / (remaining * actor.MoveSpeed));
-            State = "Jumping";
-            return;
-        }
         // A reserved anchor leaves room for other arrivals; occupants remain physical obstacles.
         if (actor.IsOnTarget() && targetDelta.magnitude < .15f)
         {
@@ -145,15 +136,6 @@ public class TileBot : MonoBehaviour
         {
             if (route[i].jump || route[waypoint].jump || !nav.CanWalk(position, route[i].position)) break;
             waypoint = i;
-        }
-        if (route[waypoint].jump && actor.Grounded)
-        {
-            jumpLanding = route[waypoint].position;
-            float duration = 2 * Mathf.Sqrt(2 * actor.JumpHeightValue / TileActor.Gravity);
-            jumpUntil = Time.time + duration;
-            actor.SetInput(Flat(jumpLanding - position) / (duration * actor.MoveSpeed), true);
-            waypoint = Mathf.Min(waypoint + 1, route.Count - 1);
-            return;
         }
         Vector3 desired = Flat(route[waypoint].position - position).normalized;
         float routeDistance = RouteDistance();

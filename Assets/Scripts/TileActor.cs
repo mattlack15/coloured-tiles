@@ -7,7 +7,7 @@ public class TileActor : MonoBehaviour
     public const float Radius = .5f;
     public const float Height = 2f;
     public const float Speed = 6f;
-    public const float JumpHeight = 1.6f;
+    public const float JumpHeight = 0f;
     public const float Gravity = 20f;
     public string DisplayName = "YOU";
     public string PersonalityName = "";
@@ -37,7 +37,6 @@ public class TileActor : MonoBehaviour
     Vector3 launchVelocity;
     float launchSpeed = 10, launchUpSpeed = 24;
     float vertical;
-    bool jump;
 
     void Awake()
     {
@@ -70,12 +69,11 @@ public class TileActor : MonoBehaviour
     public void SetInput(Vector3 direction, bool jumpPressed = false)
     {
         intent = IsDead || IsLaunched ? Vector3.zero : Vector3.ClampMagnitude(new Vector3(direction.x, 0, direction.z), 1);
-        jump |= jumpPressed && !IsDead && !IsLaunched;
     }
     public void ConfigureMovement(float speed, float jumpHeight, float outward, float upward)
     {
         MoveSpeed = Mathf.Max(.1f, speed);
-        JumpHeightValue = Mathf.Max(0, jumpHeight);
+        JumpHeightValue = 0;
         launchSpeed = outward;
         launchUpSpeed = upward;
     }
@@ -101,7 +99,6 @@ public class TileActor : MonoBehaviour
         Result = "";
         intent = walking = shove = Velocity = Vector3.zero;
         vertical = -2;
-        jump = false;
     }
     public void Assign(int colour, Renderer target, Vector3 slot, Color tint)
     {
@@ -160,7 +157,6 @@ public class TileActor : MonoBehaviour
         LivesRemaining = Mathf.Max(0, LivesRemaining - 1);
         Result = reason;
         intent = walking = Vector3.zero;
-        jump = false;
         foreach (var renderer in bodyRenderers) renderer.enabled = false;
         controller.enabled = false;
     }
@@ -173,8 +169,6 @@ public class TileActor : MonoBehaviour
         if (!isActiveAndEnabled || IsDead) { Velocity = Vector3.zero; return; }
         Vector3 before = transform.position;
         if (!IsLaunched && Grounded && vertical < 0) vertical = -2;
-        if (jump && Grounded && !IsLaunched) vertical = Mathf.Sqrt(2 * Gravity * JumpHeightValue);
-        jump = false;
         vertical -= Gravity * dt;
         // Match the original player's immediate input response. Only contact adds displacement.
         walking = intent * MoveSpeed;

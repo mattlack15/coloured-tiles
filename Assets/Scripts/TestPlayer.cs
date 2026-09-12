@@ -6,7 +6,7 @@ public class TestPlayer : MonoBehaviour
 {
     public bool ControlsEnabled { get; set; }
     public float speed = 6;
-    public float jumpHeight = 1.6f;
+    [HideInInspector] public float jumpHeight = 0;
     public float launchSpeed = 10;
     public float launchUpSpeed = 24;
     public TileActor Actor { get; private set; }
@@ -28,7 +28,7 @@ public class TestPlayer : MonoBehaviour
         if (!Actor) return;
         float x = (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) ? 1 : 0) - (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) ? 1 : 0);
         float z = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ? 1 : 0) - (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ? 1 : 0);
-        Actor.SetInput(new Vector3(x,0,z), Input.GetKeyDown(KeyCode.Space));
+        Actor.SetInput(new Vector3(x,0,z));
     }
     public void Die() { if (Actor) Actor.Die(); }
     public void Respawn(Vector3 position) { if (Actor) Actor.ResetRound(position); }
