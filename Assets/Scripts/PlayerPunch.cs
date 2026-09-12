@@ -72,6 +72,10 @@ namespace Jam
             Hitbox.transform.position = at;
             Hitbox.transform.rotation = Quaternion.LookRotation(_aim, Vector3.up);
 
+            // Turn the body to match, so the punch reads as coming from where the player is facing
+            // rather than sideways out of a body still pointed the other way.
+            transform.rotation = Quaternion.LookRotation(_aim, Vector3.up);
+
             Hitbox.gameObject.SetActive(true);
             Hitbox.Fire();                       // lands once per press, not every frame it is armed
             _armedUntil = Time.time + ArmSeconds;

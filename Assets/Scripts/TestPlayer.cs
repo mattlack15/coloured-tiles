@@ -4,9 +4,11 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(CharacterController))]
 public class TestPlayer : MonoBehaviour
 {
+    /// <summary>Gate for the title screen: false until Start is pressed, so nothing moves behind it.</summary>
+    public bool ControlsEnabled { get; set; }
     public float speed = 6;
-    public float launchSpeed = 18;
-    public float launchUpSpeed = 9;
+    public float launchSpeed = 10;
+    public float launchUpSpeed = 24;
     CharacterController controller;
     float vertical;
     bool dead;
@@ -19,6 +21,7 @@ public class TestPlayer : MonoBehaviour
     void Update()
     {
         if (Jam.InputBridge.RestartPressed) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        if (!ControlsEnabled) return;
         if (dead) return;
         if (!launched && controller.isGrounded && vertical < 0) vertical = -2;
         // Jumping is deliberately gone. It let a player hop over the crowd and, worse, hop off a
@@ -26,6 +29,12 @@ public class TestPlayer : MonoBehaviour
         vertical -= 20 * Time.deltaTime;
         Vector2 input = Jam.InputBridge.Move;
         Vector3 move = launched ? launchVelocity : Vector3.ClampMagnitude(new Vector3(input.x,0,input.y),1) * speed;
+
+        // Face the way we are going, so the body and the punch agree about which way is forward.
+        Vector3 facing = new Vector3(input.x, 0f, input.y);
+        if (facing.sqrMagnitude > 0.01f)
+            transform.rotation = Quaternion.Slerp(transform.rotation,
+                Quaternion.LookRotation(facing.normalized, Vector3.up), 14f * Time.deltaTime);
         controller.Move((move + Vector3.up * vertical) * Time.deltaTime);
         if (transform.position.y < -9) Die();
     }

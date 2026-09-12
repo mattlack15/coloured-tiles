@@ -149,6 +149,9 @@ public static class MapBuilder
         var cc = player.AddComponent<CharacterController>();
         player.AddComponent<TestPlayer>();
 
+        // Their outlined-Bob look, kept as-is.
+        player.AddComponent<PlayerOutline>();
+
         // Lets the crowd shove the player without ever going through PhysX, which would resolve the
         // contact by moving the CharacterController - sometimes upward, which floats the player.
         var push = player.AddComponent<CrowdPushReceiver>();

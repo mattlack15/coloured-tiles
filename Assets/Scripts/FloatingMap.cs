@@ -58,6 +58,19 @@ public class FloatingMap : MonoBehaviour, IArena
         index >= 0 && index < colours.Length ? colours[index] : Color.white;
 
     public string Phase { get; private set; }
+
+    [Header("Title screen")]
+    public string gameTitle = "FLOATING TILES";
+
+    /// <summary>False until Start is pressed on the title screen. Nothing runs until then.</summary>
+    public bool HasStarted { get; private set; }
+
+    public void BeginGame()
+    {
+        if (HasStarted) return;
+        HasStarted = true;
+        if (player != null) player.ControlsEnabled = true;
+    }
     public float Remaining { get; private set; }
     public int RoundNumber { get; private set; }
     public bool GameOver { get; private set; }
@@ -112,6 +125,10 @@ public class FloatingMap : MonoBehaviour, IArena
 
         RegisterParticipants();
         if (player && spawnPoint) player.Respawn(RandomBoardPosition());
+
+        // The title screen owns the player until Start is pressed.
+        if (player != null) player.ControlsEnabled = false;
+
         StartCoroutine(Rounds());
     }
 
@@ -317,6 +334,10 @@ public class FloatingMap : MonoBehaviour, IArena
 
     IEnumerator Rounds()
     {
+        // Hold on the title screen. No round runs and nobody moves until Start is pressed.
+        Phase = "Press Start";
+        while (!HasStarted) yield return null;
+
         Phase = "All tiles black — get ready";
         yield return Countdown(initialSeconds);
 

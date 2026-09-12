@@ -12677,6 +12677,7 @@ GameObject:
   - component: {fileID: 1136459379}
   - component: {fileID: 1136459378}
   - component: {fileID: 1136459377}
+  - component: {fileID: 1136459380}
   m_Layer: 0
   m_Name: Floating Map
   m_TagString: Untagged
@@ -12791,6 +12792,7 @@ MonoBehaviour:
   - {fileID: 305585200}
   - {fileID: 1666028122}
   player: {fileID: 0}
+  gameTitle: FLOATING TILES
 --- !u!4 &1136459379
 Transform:
   m_ObjectHideFlags: 0
@@ -13056,6 +13058,18 @@ Transform:
   - {fileID: 1290558886}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1136459380
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1136459376}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6583c0a1d7d949c1b2024429453a8e54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TitleScreen
 --- !u!1 &1150593246
 GameObject:
   m_ObjectHideFlags: 0
@@ -17665,6 +17679,7 @@ GameObject:
   - component: {fileID: 1472130540}
   - component: {fileID: 1472130543}
   - component: {fileID: 1472130544}
+  - component: {fileID: 1472130545}
   m_Layer: 8
   m_Name: Test Player
   m_TagString: Untagged
@@ -17685,7 +17700,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TestPlayer
   speed: 6
-  jumpHeight: 1.6
   launchSpeed: 18
   launchUpSpeed: 9
 --- !u!143 &1472130541
@@ -17759,13 +17773,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c81e84c8f983d48c3839f51a67720b10, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Jam.PlayerPunch
-  PunchKey: 19
-  AlternatePunchKey: 24
   Reach: 1.1
   Hitbox: {fileID: 1240525168}
   TargetMask:
     serializedVersion: 2
     m_Bits: 512
+--- !u!114 &1472130545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1472130539}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0697ad3969df4d57a8b48da0dba089a4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerOutline
+  outlineColour: {r: 1, g: 1, b: 1, a: 1}
+  outlineWidth: 0.045
 --- !u!1 &1472217663
 GameObject:
   m_ObjectHideFlags: 0

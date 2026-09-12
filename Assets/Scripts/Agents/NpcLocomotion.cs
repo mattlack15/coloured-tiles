@@ -44,7 +44,7 @@ namespace Jam
         public float PlayerPushMinSpeed = 0.5f;
 
         [Tooltip("The player's push force, kept in sync with CrowdPushReceiver.PushForce. Used to split an overlap between the two bodies by relative strength.")]
-        public float PlayerForce = 2.2f;
+        public float PlayerForce = 0.55f;
 
         [Header("Shoving")]
         [Tooltip("How hard this agent shoves. Compared with a neighbour's force, and only the weaker body moves, so a contact resolves once instead of both pushing apart.")]
