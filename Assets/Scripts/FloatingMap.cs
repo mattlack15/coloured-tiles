@@ -18,7 +18,7 @@ using UnityEngine;
 /// Falling costs a life; three lives and you are out. Anyone who fell sits out the rest of the
 /// round and respawns on the edge platform when the next one starts. Survivors never move.
 /// </summary>
-public class FloatingMap : MonoBehaviour
+public class FloatingMap : MonoBehaviour, IArena
 {
     [Header("Phase timing")]
     [Min(0)] public float initialSeconds = 10;
@@ -49,13 +49,29 @@ public class FloatingMap : MonoBehaviour
     readonly List<TileParticipant> participants = new List<TileParticipant>();
     public IReadOnlyList<TileParticipant> Participants => participants;
 
+    // Index order matches Jam.ColorId (Red, Green, Blue, Yellow) so the crowd can read this arena
+    // through that enum. The RGB values are the original ones, just re-ordered.
     readonly Color black = new Color(.015f, .018f, .025f);
-    readonly Color[] colours = { new Color(.05f, .35f, 1), new Color(1, .08f, .12f), new Color(1, .85f, .02f), new Color(.05f, 1, .3f) };
-    readonly string[] names = { "BLUE", "RED", "YELLOW", "GREEN" };
+    readonly Color[] colours = { new Color(1, .08f, .12f), new Color(.05f, 1, .3f), new Color(.05f, .35f, 1), new Color(1, .85f, .02f) };
+    readonly string[] names = { "RED", "GREEN", "BLUE", "YELLOW" };
 
     readonly List<Material> owned = new List<Material>();
     int[] tileColours;
     Transform[] outlines;
+
+    // ---- arena metrics, derived from the tiles in Start ----
+    readonly List<Vector2Int>[] _tilesByColour = new List<Vector2Int>[4];
+    static readonly int[] StepX = { 1, -1, 0, 0, 1, 1, -1, -1 };
+    static readonly int[] StepY = { 0, 0, 1, -1, 1, -1, 1, -1 };
+    int _gridW = 5, _gridH = 5;
+    float _spacing = 2.2f;
+    Vector3 _cellOrigin;
+    float _standY;
+    float _halfX, _halfZ;
+    bool _ready;
+
+    /// <summary>Raised when colours are re-dealt, which is the only moment an agent's colour changes.</summary>
+    public event System.Action<int> CycleAdvanced;
 
     void Start()
     {
@@ -71,9 +87,42 @@ public class FloatingMap : MonoBehaviour
         SetPlatform(true);
         foreach (var tile in tiles) tile.material.color = black;
 
+        // Must run while every tile is still active: lip distance and standing height are read from
+        // tile bounds, and a dropped tile's collider reports a degenerate box.
+        DeriveGridMetrics();
+
         RegisterParticipants();
         if (player && spawnPoint) player.Respawn(spawnPoint.position);
         StartCoroutine(Rounds());
+    }
+
+    /// <summary>
+    /// Derive the grid from the tiles themselves rather than assuming 5x5, so regenerating the
+    /// map at a different size through MapBuilder does not silently break the crowd.
+    /// </summary>
+    void DeriveGridMetrics()
+    {
+        for (int c = 0; c < _tilesByColour.Length; c++) _tilesByColour[c] = new List<Vector2Int>();
+
+        _gridW = Mathf.Max(1, Mathf.RoundToInt(Mathf.Sqrt(tiles.Length)));
+        _gridH = Mathf.Max(1, tiles.Length / _gridW);
+        _cellOrigin = tiles[0].transform.position;
+
+        if (_gridW > 1)
+        {
+            Vector3 step = tiles[1].transform.position - tiles[0].transform.position;
+            float s = new Vector2(step.x, step.z).magnitude;
+            if (s > 0.01f) _spacing = s;
+        }
+
+        // Standing height and lip distance must be read while every tile is present, because a
+        // dropped tile's collider reports a degenerate box.
+        float halfTile = Mathf.Abs(tiles[0].bounds.extents.x);
+        _standY = tiles[0].bounds.max.y;
+        _halfX = (_gridW - 1) * 0.5f * _spacing + halfTile;
+        _halfZ = (_gridH - 1) * 0.5f * _spacing + halfTile;
+
+        _ready = true;
     }
 
     /// <summary>
@@ -151,6 +200,19 @@ public class FloatingMap : MonoBehaviour
 
         Shuffle(active);
         for (int i = 0; i < active.Count; i++) active[i].Colour = i % colours.Length;
+
+        RebuildColourIndex();
+        CycleAdvanced?.Invoke(RoundNumber);
+    }
+
+    void RebuildColourIndex()
+    {
+        for (int c = 0; c < _tilesByColour.Length; c++) _tilesByColour[c].Clear();
+        for (int i = 0; i < tileColours.Length; i++)
+        {
+            if (tileColours[i] < 0 || tileColours[i] >= _tilesByColour.Length) continue;
+            _tilesByColour[tileColours[i]].Add(new Vector2Int(i % _gridW, i / _gridW));
+        }
     }
 
     static void Shuffle<T>(List<T> list)
@@ -293,6 +355,87 @@ public class FloatingMap : MonoBehaviour
         foreach (var p in participants) if (p != null && p.Alive) n++;
         return n;
     }
+
+    // ------------------------------------------------------------------ IArena
+
+    public bool Ready => _ready;
+    public int Width => _gridW;
+    public int Height => _gridH;
+
+    public int LitTileCount
+    {
+        get
+        {
+            int n = 0;
+            for (int i = 0; i < tileColours.Length; i++) if (tileColours[i] >= 0) n++;
+            return n;
+        }
+    }
+
+    public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < _gridW && y < _gridH;
+
+    public Vector2Int WorldToCell(Vector3 world)
+    {
+        int x = Mathf.RoundToInt((world.x - _cellOrigin.x) / _spacing);
+        int y = Mathf.RoundToInt((world.z - _cellOrigin.z) / _spacing);
+        return new Vector2Int(Mathf.Clamp(x, 0, _gridW - 1), Mathf.Clamp(y, 0, _gridH - 1));
+    }
+
+    public Vector3 CellToWorld(Vector2Int cell)
+    {
+        Vector3 p = tiles[Index(cell)].transform.position;
+        return new Vector3(p.x, _standY, p.z);
+    }
+
+    public Vector2Int RandomInteriorCell(int margin)
+    {
+        int lo = Mathf.Clamp(margin, 0, Mathf.Min(_gridW, _gridH) / 2 - 1);
+        return new Vector2Int(Random.Range(lo, _gridW - lo), Random.Range(lo, _gridH - lo));
+    }
+
+    public bool IsLit(Vector2Int cell) => InBounds(cell.x, cell.y) && tileColours[Index(cell)] >= 0;
+
+    public ColorId ColourOf(Vector2Int cell) => (ColorId)tileColours[Index(cell)];
+
+    public IReadOnlyList<Vector2Int> TilesOfColor(ColorId c) => _tilesByColour[(int)c];
+
+    public Vector3 PlatformCenter => transform.position;
+
+    public float DistanceToEdge(Vector3 world)
+    {
+        Vector3 local = transform.InverseTransformPoint(world);
+        return Mathf.Min(_halfX - Mathf.Abs(local.x), _halfZ - Mathf.Abs(local.z));
+    }
+
+    public void BfsFrom(Vector2Int from, int[,] dst)
+    {
+        for (int x = 0; x < _gridW; x++)
+            for (int y = 0; y < _gridH; y++)
+                dst[x, y] = -1;
+
+        if (!_ready || !InBounds(from.x, from.y)) return;
+
+        var q = new Queue<Vector2Int>();
+        dst[from.x, from.y] = 0;
+        q.Enqueue(from);
+
+        while (q.Count > 0)
+        {
+            var c = q.Dequeue();
+            int nd = dst[c.x, c.y] + 1;
+            for (int i = 0; i < 8; i++)
+            {
+                int nx = c.x + StepX[i], ny = c.y + StepY[i];
+                if (!InBounds(nx, ny)) continue;
+                if (dst[nx, ny] >= 0) continue;
+                if (i >= 4 && (!InBounds(c.x + StepX[i], c.y) || !InBounds(c.x, c.y + StepY[i]))) continue;
+                dst[nx, ny] = nd;
+                q.Enqueue(new Vector2Int(nx, ny));
+            }
+        }
+    }
+
+    int Index(Vector2Int cell) => cell.y * _gridW + cell.x;
 
     void OnDestroy() { foreach (var m in owned) if (m) Destroy(m); }
 

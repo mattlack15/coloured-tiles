@@ -100,6 +100,10 @@ namespace Jam
         public int PlayerFalls { get; private set; }
         public bool Won { get; private set; }
         public BoardManager Board { get; private set; }
+
+        /// <summary>Crowd-owned congestion bookkeeping. Handed to every brain; the arena itself no
+        /// longer carries agent state.</summary>
+        public CrowdRegistry Registry { get; private set; }
         public PlayerController Player { get; private set; }
 
         Transform _agentsRoot;
@@ -188,6 +192,8 @@ namespace Jam
             Board.LitGroupsPerColor = litGroupsPerColor;
             Board.LitTilesPerGroup = litTilesPerGroup;
             Board.Generate();
+
+            Registry = new CrowdRegistry();
         }
 
         void BuildNavMesh()
@@ -332,7 +338,7 @@ namespace Jam
                 Vector3 pos = FindSpawn(Board.CellToWorld(Board.RandomInteriorCell(2)), ref rng);
                 root.transform.position = pos;
 
-                brain.Init(Board, this, i, NextColor(rng), traits, body, line, faller);
+                brain.Init(Board, Registry, this, i, NextColor(rng), traits, body, line, faller);
 
                 if (agent.isOnNavMesh) agent.Warp(pos);
                 _spawnedNpcs++;

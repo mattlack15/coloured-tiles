@@ -14,7 +14,7 @@ namespace Jam
     /// than a step to the nearest match. That is what makes the crowd matter: everyone of a given
     /// colour is heading for the same three or four spots.
     /// </summary>
-    public class BoardManager : MonoBehaviour
+    public class BoardManager : MonoBehaviour, IArena
     {
         int _width = 14;
         int _height = 14;
@@ -39,18 +39,14 @@ namespace Jam
         /// <summary>How many tiles each blob covers.</summary>
         public int LitTilesPerGroup { get; set; } = 3;
 
-        public event System.Action<int> BeatAdvanced;
+        public event System.Action<int> CycleAdvanced;
 
         Tile[,] _tiles;
         bool[,] _lit;
-        int[,] _inbound;            // agents that have committed to this tile as a target
-        int[,] _occupancy;          // agents physically standing on this tile
         readonly List<Vector2Int>[] _tilesOfColor = new List<Vector2Int>[Palette.Count];
 
         System.Random _rng;
         float _beatTimer;
-        ColorId _playerColor;
-        int _tilesOfPlayerColor;
 
         static readonly int[] Dx = { 1, -1, 0, 0, 1, 1, -1, -1 };
         static readonly int[] Dy = { 0, 0, 1, -1, 1, -1, 1, -1 };
@@ -75,8 +71,6 @@ namespace Jam
 
             _tiles = new Tile[Width, Height];
             _lit = new bool[Width, Height];
-            _inbound = new int[Width, Height];
-            _occupancy = new int[Width, Height];
 
             for (int c = 0; c < Palette.Count; c++) _tilesOfColor[c] = new List<Vector2Int>();
 
@@ -135,7 +129,7 @@ namespace Jam
                 _beatTimer -= BeatSeconds;
                 Beat++;
                 StartBeat();
-                BeatAdvanced?.Invoke(Beat);
+                CycleAdvanced?.Invoke(Beat);
             }
         }
 
@@ -148,8 +142,6 @@ namespace Jam
                     _lit[x, y] = false;
 
             for (int c = 0; c < Palette.Count; c++) _tilesOfColor[c].Clear();
-
-            _tilesOfPlayerColor = 0;
 
             for (int c = 0; c < Palette.Count; c++)
                 for (int g = 0; g < LitGroupsPerColor; g++)
@@ -164,9 +156,6 @@ namespace Jam
                     t.SetDark();
                 }
             }
-
-            foreach (var cell in _tilesOfColor[(int)_playerColor])
-                if (_lit[cell.x, cell.y]) _tilesOfPlayerColor++;
         }
 
         void LightBlob(ColorId c, int count)
@@ -207,7 +196,6 @@ namespace Jam
             _tilesOfColor[(int)c].Add(cell);
         }
 
-        public int TilesMatchingPlayerColor => _tilesOfPlayerColor;
         public int LitTileCount
         {
             get
@@ -218,21 +206,10 @@ namespace Jam
             }
         }
 
-        public void SetPlayerTargetColor(ColorId c)
-        {
-            _playerColor = c;
-            if (!Ready) return;
-
-            _tilesOfPlayerColor = _tilesOfColor[(int)c].Count;
-        }
-
-        public ColorId NewColorDifferent(ColorId avoid, ref uint rng)
-        {
-            int pick = (int)(Palette.Hash01(ref rng) * (Palette.Count - 1));
-            int a = (int)avoid;
-            if (pick >= a) pick++;
-            return (ColorId)Mathf.Clamp(pick, 0, Palette.Count - 1);
-        }
+        /// <summary>Colours are re-dealt by the agents themselves on each cycle, so the arena only
+        /// has to expose the shared helper.</summary>
+        public ColorId NewColorDifferent(ColorId avoid, ref uint rng) =>
+            Palette.NewColorDifferent(avoid, ref rng);
 
         // ------------------------------------------------------------------ geometry
 
@@ -254,7 +231,11 @@ namespace Jam
         public bool Walkable(Vector2Int c) => Walkable(c.x, c.y);
 
         public Tile GetTile(Vector2Int c) => Ready && InBounds(c.x, c.y) ? _tiles[c.x, c.y] : null;
-        public List<Vector2Int> TilesOfColor(ColorId c) => _tilesOfColor[(int)c];
+        public IReadOnlyList<Vector2Int> TilesOfColor(ColorId c) => _tilesOfColor[(int)c];
+
+        public bool IsLit(Vector2Int c) => Ready && InBounds(c.x, c.y) && _lit[c.x, c.y];
+
+        public ColorId ColourOf(Vector2Int c) => _tiles[c.x, c.y].Current;
 
         public Vector2Int WorldToCell(Vector3 world)
         {
@@ -280,27 +261,6 @@ namespace Jam
             int span = Mathf.Max(1, Width - lo * 2);
             int spanZ = Mathf.Max(1, Height - lo * 2);
             return new Vector2Int(_rng.Next(lo, lo + span), _rng.Next(lo, lo + spanZ));
-        }
-
-        // ------------------------------------------------------------------ congestion bookkeeping
-
-        public int Inbound(Vector2Int c) => Ready && InBounds(c.x, c.y) ? _inbound[c.x, c.y] : 0;
-        public void AddInbound(Vector2Int c) { if (Ready && InBounds(c.x, c.y)) _inbound[c.x, c.y]++; }
-        public void RemoveInbound(Vector2Int c) { if (Ready && InBounds(c.x, c.y)) _inbound[c.x, c.y] = Mathf.Max(0, _inbound[c.x, c.y] - 1); }
-
-        public void AddOccupant(Vector2Int c) { if (Ready && InBounds(c.x, c.y)) _occupancy[c.x, c.y]++; }
-        public void RemoveOccupant(Vector2Int c) { if (Ready && InBounds(c.x, c.y)) _occupancy[c.x, c.y] = Mathf.Max(0, _occupancy[c.x, c.y] - 1); }
-
-        public int Occupancy(Vector2Int c) => Ready && InBounds(c.x, c.y) ? _occupancy[c.x, c.y] : 0;
-
-        public int OccupancyAround(Vector2Int c, int radius)
-        {
-            if (!Ready) return 0;
-            int total = 0;
-            for (int x = c.x - radius; x <= c.x + radius; x++)
-                for (int y = c.y - radius; y <= c.y + radius; y++)
-                    if (InBounds(x, y)) total += _occupancy[x, y];
-            return total;
         }
 
         // ------------------------------------------------------------------ pathing

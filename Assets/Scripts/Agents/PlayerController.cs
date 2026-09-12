@@ -16,7 +16,7 @@ namespace Jam
     [RequireComponent(typeof(CharacterController))]
     public class PlayerController : MonoBehaviour
     {
-        public BoardManager Board;
+        public IArena Board;
         public GameBootstrap Game;
         public Faller Faller;
         public float Speed = 4.5f;
@@ -43,7 +43,7 @@ namespace Jam
         Vector3 _lastMoveDir = Vector3.forward;
         readonly Collider[] _overlap = new Collider[32];
 
-        public void Init(BoardManager board, GameBootstrap game, MeshRenderer body, LayerMask npcMask,
+        public void Init(IArena board, GameBootstrap game, MeshRenderer body, LayerMask npcMask,
                          ColorId startColor, Faller faller)
         {
             Board = board;
@@ -55,20 +55,18 @@ namespace Jam
             Faller = faller;
 
             Faller.Respawned += OnRespawned;
-            Board.BeatAdvanced += OnBeat;
+            Board.CycleAdvanced += OnBeat;
 
             ApplyBodyColor();
-            Board.SetPlayerTargetColor(AssignedColor);
             _lastClaimCell = board.WorldToCell(transform.position);
         }
 
         /// <summary>The board re-rolls the player's colour once per beat, exactly like the NPCs.</summary>
         void OnBeat(int beat)
         {
-            AssignedColor = Board.NewColorDifferent(AssignedColor, ref _rng);
+            AssignedColor = Palette.NewColorDifferent(AssignedColor, ref _rng);
             ClaimedThisBeat = false;
             ApplyBodyColor();
-            Board.SetPlayerTargetColor(AssignedColor);
         }
 
         void ApplyBodyColor()
@@ -122,8 +120,7 @@ namespace Jam
             if (!Game.RoundActive) return;
 
             var cell = Board.WorldToCell(transform.position);
-            var tile = Board.GetTile(cell);
-            if (_claimCooldown <= 0f && tile != null && tile.Lit && tile.Current == AssignedColor && cell != _lastClaimCell)
+            if (_claimCooldown <= 0f && Board.IsLit(cell) && Board.ColourOf(cell) == AssignedColor && cell != _lastClaimCell)
                 Claim(cell);
         }
 
@@ -175,7 +172,7 @@ namespace Jam
         void OnDestroy()
         {
             if (Faller != null) Faller.Respawned -= OnRespawned;
-            if (Board != null) Board.BeatAdvanced -= OnBeat;
+            if (Board != null) Board.CycleAdvanced -= OnBeat;
         }
     }
 }

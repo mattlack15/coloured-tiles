@@ -119,5 +119,15 @@ namespace Jam
             state ^= state << 5;
             return (state & 0xFFFFFF) / (float)0xFFFFFF;
         }
+
+        /// <summary>Pick a colour that is not <paramref name="avoid"/>, so a new cycle always forces
+        /// the agent to move rather than letting it re-camp where it stands.</summary>
+        public static ColorId NewColorDifferent(ColorId avoid, ref uint rng)
+        {
+            int pick = (int)(Hash01(ref rng) * (Count - 1));
+            int a = (int)avoid;
+            if (pick >= a) pick++;
+            return (ColorId)Mathf.Clamp(pick, 0, Count - 1);
+        }
     }
 }

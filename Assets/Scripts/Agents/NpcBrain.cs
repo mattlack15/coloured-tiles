@@ -20,7 +20,9 @@ namespace Jam
     /// </summary>
     public class NpcBrain : MonoBehaviour
     {
-        public BoardManager Board;
+        public IArena Board;
+        /// <summary>Crowd-owned congestion bookkeeping; deliberately not part of the arena.</summary>
+        public CrowdRegistry Registry;
         public NpcLocomotion Loco;
         public GameBootstrap Game;
         public NpcTraits Traits;
@@ -51,9 +53,10 @@ namespace Jam
         Vector2Int _occupancyCell = new Vector2Int(-1, -1);
         Vector2Int _lastClaimCell = new Vector2Int(-999, -999);
 
-        public void Init(BoardManager board, GameBootstrap game, int id, ColorId color,
+        public void Init(IArena board, CrowdRegistry registry, GameBootstrap game, int id, ColorId color,
                          NpcTraits traits, MeshRenderer body, LineRenderer line, Faller faller)
         {
+            Registry = registry;
             Board = board;
             Game = game;
             Loco = GetComponent<NpcLocomotion>();
@@ -81,7 +84,7 @@ namespace Jam
             _lastClaimCell = board.WorldToCell(transform.position);
 
             Faller.Respawned += OnRespawned;
-            Board.BeatAdvanced += OnBeat;
+            Board.CycleAdvanced += OnBeat;
 
             ApplyBodyColor();
         }
@@ -98,7 +101,7 @@ namespace Jam
         /// NPC's colour ever changes.</summary>
         void OnBeat(int beat)
         {
-            AssignedColor = Board.NewColorDifferent(AssignedColor, ref _rng);
+            AssignedColor = Palette.NewColorDifferent(AssignedColor, ref _rng);
             ApplyBodyColor();
 
             ClaimedThisBeat = false;
@@ -152,8 +155,8 @@ namespace Jam
             CheckEdgeSlip(dt);
 
             // Standing on a lit tile of my colour - claim it, subject to the shared cooldown.
-            var here = Board.GetTile(cell);
-            if (_claimCooldown <= 0f && here != null && here.Lit && here.Current == AssignedColor && cell != _lastClaimCell)
+            var here = Board.IsLit(cell) && Board.ColourOf(cell) == AssignedColor;
+            if (_claimCooldown <= 0f && here && cell != _lastClaimCell)
             {
                 Claim(cell);
                 return;
@@ -179,8 +182,7 @@ namespace Jam
 
         bool IsTargetStillValid()
         {
-            var t = Board.GetTile(TargetCell);
-            return t != null && t.Lit && t.Current == AssignedColor;
+            return Board.IsLit(TargetCell) && Board.ColourOf(TargetCell) == AssignedColor;
         }
 
         bool Arrived()
@@ -335,7 +337,7 @@ namespace Jam
 
             ReleaseTarget();
             TargetCell = best;
-            Board.AddInbound(best);
+            Registry.AddInbound(best);
             Loco.SetTarget(Board.CellToWorld(best) + _approachOffset);
 
             _reactTimer = 0f;
@@ -358,7 +360,7 @@ namespace Jam
             float travel = Traits.PrefersFar ? distance : -distance;
             float s = travel * Traits.DistanceWeight;
 
-            float contest = Board.Inbound(tile) + Board.OccupancyAround(tile, 2) * 0.4f;
+            float contest = Registry.Inbound(tile) + Registry.OccupancyAround(tile, 2) * 0.4f;
             s -= contest * Traits.CongestionWeight;
 
             if (Traits.PreferredDistance > 0f)
@@ -372,7 +374,7 @@ namespace Jam
 
         void ReleaseTarget()
         {
-            if (Board != null && TargetCell.x >= 0) Board.RemoveInbound(TargetCell);
+            if (Registry != null && TargetCell.x >= 0) Registry.RemoveInbound(TargetCell);
             TargetCell = new Vector2Int(-1, -1);
         }
 
@@ -392,7 +394,7 @@ namespace Jam
 
         void UpdateOccupancy()
         {
-            if (Board == null || !Board.Ready) return;
+            if (Board == null || !Board.Ready || Registry == null) return;
             UpdateOccupancy(Board.WorldToCell(transform.position));
         }
 
@@ -400,15 +402,15 @@ namespace Jam
         {
             if (cell == _occupancyCell) return;
             ReleaseOccupancy();
-            Board.AddOccupant(cell);
+            Registry.AddOccupant(cell);
             _occupancyCell = cell;
         }
 
         void ReleaseOccupancy()
         {
-            if (Board == null || !Board.Ready) return;
+            if (Board == null || !Board.Ready || Registry == null) return;
             if (_occupancyCell.x < 0) return;
-            Board.RemoveOccupant(_occupancyCell);
+            Registry.RemoveOccupant(_occupancyCell);
             _occupancyCell = new Vector2Int(-1, -1);
         }
 
@@ -430,8 +432,8 @@ namespace Jam
         void OnDestroy()
         {
             if (Faller != null) Faller.Respawned -= OnRespawned;
-            if (Board != null) Board.BeatAdvanced -= OnBeat;
-            if (Board == null || !Board.Ready) return;
+            if (Board != null) Board.CycleAdvanced -= OnBeat;
+            if (Board == null || !Board.Ready || Registry == null) return;
             ReleaseOccupancy();
             ReleaseTarget();
         }

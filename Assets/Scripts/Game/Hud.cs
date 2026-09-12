@@ -46,7 +46,7 @@ namespace Jam
             GUI.color = Color.white;
 
             GUI.Label(new Rect(72, 44, 700, 26),
-                $"YOUR COLOUR   -   {board.TilesMatchingPlayerColor} lit tiles for you out of {board.LitTileCount} lit on the board", _label);
+                $"YOUR COLOUR   -   {board.TilesOfColor(player.AssignedColor).Count} lit tiles for you out of {board.LitTileCount} lit on the board", _label);
             GUI.Label(new Rect(72, 68, 620, 22),
                 player.ClaimedThisBeat ? "this beat: claimed" : "this beat: still looking...", _small);
 
