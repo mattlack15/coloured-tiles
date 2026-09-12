@@ -10,7 +10,7 @@ public class FloatingMap : MonoBehaviour
     [Min(2)] public float resolveSeconds = 4;
     [Min(.01f)] public float fadeSeconds = 1;
     [Range(3, 4)] public int litTileCount = 4;
-    [Range(0, 11)] public int botCount = 11;
+    [Range(0, 15)] public int botCount = 15;
     [Tooltip("Zero gives a different match each time; another value reproduces a match.")]
     public int randomSeed;
     public Transform spawnPoint;
@@ -64,8 +64,8 @@ public class FloatingMap : MonoBehaviour
             Human.Map = this;
             actors.Add(Human);
         }
-        string[] names = { "Pip", "Tank", "Scout", "Moss", "Brick", "Dash", "Fern", "Bash", "Wren", "Ash", "Boulder" };
-        for (int i = 0; i < Mathf.Clamp(botCount, 0, 11); i++)
+        string[] names = { "Pip", "Tank", "Scout", "Moss", "Brick", "Dash", "Fern", "Bash", "Wren", "Ash", "Boulder", "Rook", "Clover", "Rocky", "Finch" };
+        for (int i = 0; i < Mathf.Clamp(botCount, 0, 15); i++)
         {
             var go = new GameObject(names[i]);
             go.transform.SetParent(transform);
@@ -91,7 +91,9 @@ public class FloatingMap : MonoBehaviour
             new Vector3(-3, y, 6.4f), new Vector3(3, y, -6.4f), new Vector3(-6.4f, y, 2.2f),
             new Vector3(6.4f, y, -2.2f), new Vector3(3, y, 6.4f), new Vector3(-3, y, -6.4f),
             new Vector3(6.4f, y, 2.2f), new Vector3(-6.4f, y, -2.2f), new Vector3(0, y, 6.4f),
-            new Vector3(-6.4f, y, 0), new Vector3(6.4f, y, 0)
+            new Vector3(-6.4f, y, 0), new Vector3(6.4f, y, 0),
+            new Vector3(-5, y, -6.4f), new Vector3(5, y, -6.4f),
+            new Vector3(-5, y, 6.4f), new Vector3(5, y, 6.4f)
         };
         spawns.AddRange(positions);
     }

@@ -11284,7 +11284,7 @@ MonoBehaviour:
   resolveSeconds: 4
   fadeSeconds: 1
   litTileCount: 4
-  botCount: 11
+  botCount: 15
   spawnPoint: {fileID: 1837308178}
   tiles:
   - {fileID: 1518938260}
