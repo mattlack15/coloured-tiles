@@ -445,6 +445,7 @@ MonoBehaviour:
   anchorShare: 0.28
   drifterShare: 0.22
   avoidPlayer: 0
+  playerPushSpeed: 2.2
   npcPhysicsCollisions: 0
   slipEdgeMargin: 1.05
   slipRadius: 1
@@ -455,6 +456,8 @@ MonoBehaviour:
   slipHop: 1.6
   playerFallPenalty: 3
   npcRespawnMargin: 3
+  tileMesh: {fileID: -2432090755550338912, guid: 5140b0e159a974fb8a9db928361b2ab6, type: 3}
+  playerMesh: {fileID: -2432090755550338912, guid: 95e0a9a9709d445fe9e2cf38c1822fd8, type: 3}
   roundSeconds: 120
   targetClaims: 6
   claimCooldown: 1.5

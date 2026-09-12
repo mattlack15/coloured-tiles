@@ -28,6 +28,10 @@ namespace Jam
         public const int PlayerLayer = 8;
         public const int NpcLayer = 9;
 
+        /// <summary>Height of the player's art, matched to the CharacterController so the model
+        /// fills its collider instead of hanging out of it.</summary>
+        const float PlayerVisualHeight = 1.5f;
+
         [Header("Platform")]
         public int boardWidth = 14;
         public int boardHeight = 14;
@@ -77,6 +81,12 @@ namespace Jam
         public float playerFallPenalty = 3f;
         [Tooltip("How far in from the lip NPCs respawn, in tiles.")]
         public int npcRespawnMargin = 3;
+
+        [Header("Art")]
+        [Tooltip("Tile mesh for the board. Leave empty for the flat cube fallback. The model is scaled to the tile footprint, so only its shape matters.")]
+        public Mesh tileMesh;
+        [Tooltip("Player mesh. Leave empty for the capsule fallback. Scaled to the CharacterController height and stood on its feet.")]
+        public Mesh playerMesh;
 
         [Header("Round")]
         public float roundSeconds = 120f;
@@ -188,6 +198,7 @@ namespace Jam
             var go = new GameObject("Board");
             Board = go.AddComponent<BoardManager>();
             Board.Configure(boardWidth, boardHeight, tileSize, seed);
+            Board.TileMesh = tileMesh;
             Board.BeatSeconds = beatSeconds;
             Board.LitGroupsPerColor = litGroupsPerColor;
             Board.LitTilesPerGroup = litTilesPerGroup;
@@ -255,7 +266,7 @@ namespace Jam
             fallCollider.center = new Vector3(0f, 0.75f, 0f);
             fallCollider.enabled = false;
 
-            var body = CreateBody(root.transform, PlayerLayer, 0.8f, 0.75f, 0.75f, false);
+            var body = CreatePlayerVisual(root.transform);
             CreateHalo(root.transform);
 
             Player = root.AddComponent<PlayerController>();
@@ -372,6 +383,31 @@ namespace Jam
         {
             uint state = rng;
             return (ColorId)Mathf.Clamp((int)(Palette.Hash01(ref state) * Palette.Count), 0, Palette.Count - 1);
+        }
+
+        /// <summary>
+        /// The player's look. Bob's pivot is the centre of his bounding box, so the visual is
+        /// lifted by half his own height: placed at the root he would be half buried, which is
+        /// exactly what the old capsule primitive was doing.
+        /// </summary>
+        MeshRenderer CreatePlayerVisual(Transform parent)
+        {
+            if (playerMesh == null) return CreateBody(parent, PlayerLayer, 0.8f, 0.75f, 0.75f, false);
+
+            Vector3 b = playerMesh.bounds.size;
+            Vector3 c = playerMesh.bounds.center;
+            float s = PlayerVisualHeight / Mathf.Max(0.0001f, b.y);
+
+            var go = new GameObject("Body");
+            go.layer = PlayerLayer;
+            go.transform.SetParent(parent, false);
+            go.transform.localScale = new Vector3(s, s, s);
+            // Solve localPosition.y + (c.y - b.y/2) * s = 0 so the lowest vertex sits on y=0.
+            go.transform.localPosition = new Vector3(0f, (b.y * 0.5f - c.y) * s, 0f);
+            go.AddComponent<MeshFilter>().sharedMesh = playerMesh;
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.shadowCastingMode = ShadowCastingMode.On;
+            return mr;
         }
 
         MeshRenderer CreateBody(Transform parent, int layer, float sx, float sy, float sz, bool keepCollider)

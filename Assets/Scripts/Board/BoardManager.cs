@@ -29,6 +29,10 @@ namespace Jam
         /// mode leaving behind a BoardManager whose private arrays were never serialized.</summary>
         public bool Ready => _tiles != null;
 
+        /// <summary>Optional artist mesh for the tiles. Null falls back to a flat cube. Assigned by
+        /// GameBootstrap from its serialized field, because BoardManager is created at runtime.</summary>
+        public Mesh TileMesh { get; set; }
+
         public float BeatSeconds { get; set; } = 2.5f;
         public int Beat { get; private set; }
         public float BeatProgress => BeatSeconds <= 0f ? 0f : Mathf.Clamp01(_beatTimer / BeatSeconds);
@@ -94,22 +98,46 @@ namespace Jam
             var root = new GameObject("Tiles").transform;
             root.SetParent(transform, false);
 
+            float footprint = _tileSize * 0.96f;
+            const float topY = 0.04f;
+
             for (int x = 0; x < Width; x++)
             {
                 for (int y = 0; y < Height; y++)
                 {
-                    var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    go.name = $"Tile_{x}_{y}";
-                    go.transform.SetParent(root, false);
-                    go.transform.localPosition = CellToLocal(new Vector2Int(x, y), 0.02f);
-                    go.transform.localScale = new Vector3(_tileSize * 0.96f, 0.04f, _tileSize * 0.96f);
+                    var cell = new Vector2Int(x, y);
+                    GameObject go;
 
-                    // Tiles must never block navigation; the platform slab carries the collider.
-                    var col = go.GetComponent<Collider>();
-                    if (col != null) DestroyImmediate(col);
+                    if (TileMesh != null)
+                    {
+                        // Artist's tile. Only the look changes: same footprint, same top surface,
+                        // and still no collider because the platform slab is the floor.
+                        Vector3 b = TileMesh.bounds.size;
+                        Vector3 c = TileMesh.bounds.center;
+                        float s = footprint / Mathf.Max(0.0001f, Mathf.Max(b.x, b.z));
+
+                        go = new GameObject($"Tile_{x}_{y}");
+                        go.transform.SetParent(root, false);
+                        go.transform.localScale = new Vector3(s, s, s);
+                        go.transform.localPosition = CellToLocal(cell, topY - (c.y + b.y * 0.5f) * s);
+                        go.AddComponent<MeshFilter>().sharedMesh = TileMesh;
+                        go.AddComponent<MeshRenderer>();
+                    }
+                    else
+                    {
+                        go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                        go.name = $"Tile_{x}_{y}";
+                        go.transform.SetParent(root, false);
+                        go.transform.localPosition = CellToLocal(cell, 0.02f);
+                        go.transform.localScale = new Vector3(footprint, 0.04f, footprint);
+
+                        // Tiles must never block navigation; the platform slab carries the collider.
+                        var col = go.GetComponent<Collider>();
+                        if (col != null) DestroyImmediate(col);
+                    }
 
                     var tile = go.AddComponent<Tile>();
-                    tile.Cell = new Vector2Int(x, y);
+                    tile.Cell = cell;
                     tile.Bind(go.GetComponent<MeshRenderer>());
                     tile.SetDark();
                     _tiles[x, y] = tile;

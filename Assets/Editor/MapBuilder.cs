@@ -7,6 +7,22 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class MapBuilder
 {
+    // Art. Both are plain meshes with no material bound (the OBJ files declare an mtllib but use
+    // no usemtl), so every surface colour here is assigned by code - which is what the game needs
+    // anyway, since tiles have to be tinted per colour.
+    const string TileModelPath = "Assets/Models/Tile_t2.obj";
+    const string PlayerModelPath = "Assets/Models/Bob.obj";
+
+    /// <summary>Tile footprint in world units. The model is ~1.146 wide, so this is a drop-in
+    /// replacement for the old 2.0 cube: layout, colliders and the 0.2 gaps are unchanged.</summary>
+    const float TileWorldSize = 2f;
+
+    /// <summary>Tile top surface. Must match the platform tops (scale 0.35 centred on y=0) so the
+    /// grid and the ring stay flush.</summary>
+    const float TileTopY = 0.175f;
+
+    /// <summary>Player art is scaled to the CharacterController's height, so no fixed height here.</summary>
+
     static MapBuilder()
     {
         EditorApplication.delayCall += () =>
@@ -25,12 +41,113 @@ public static class MapBuilder
         AssetDatabase.CreateAsset(m,"Assets/Generated/" + name + ".mat");
         return m;
     }
+
     static GameObject Box(string name, Vector3 pos, Vector3 scale, Material mat, Transform parent = null)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube); go.name = name;
         go.transform.SetParent(parent); go.transform.position = pos; go.transform.localScale = scale;
         go.GetComponent<Renderer>().sharedMaterial = mat; return go;
     }
+
+    /// <summary>The first Mesh sub-asset of a model file. AssetDatabase.LoadAssetAtPath&lt;Mesh&gt; does
+    /// not work on model files, because the mesh is a sub-asset rather than the main object.</summary>
+    static Mesh LoadMesh(string modelPath)
+    {
+        foreach (var o in AssetDatabase.LoadAllAssetsAtPath(modelPath))
+            if (o is Mesh m) return m;
+        return null;
+    }
+
+    /// <summary>
+    /// A tile is the artist's plate scaled to <see cref="TileWorldSize"/>, with a BoxCollider sized
+    /// to the mesh's own local bounds so the collider hugs the plate.
+    ///
+    /// The collider has to be sized explicitly: the model is much thinner than it is wide, so a
+    /// default unit BoxCollider on a uniformly scaled transform would be a cube, and bodies would
+    /// float above the visible surface by the difference.
+    /// </summary>
+    static GameObject Tile(string name, Vector3 centre, Material mat, Mesh mesh, Transform parent)
+    {
+        if (mesh == null)
+        {
+            // Fall back to the old cube so a missing model degrades instead of breaking the map.
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cube.name = name; cube.transform.SetParent(parent); cube.transform.position = centre;
+            cube.transform.localScale = new Vector3(TileWorldSize, 0.35f, TileWorldSize);
+            cube.GetComponent<Renderer>().sharedMaterial = mat;
+            return cube;
+        }
+
+        Vector3 b = mesh.bounds.size;
+        Vector3 c = mesh.bounds.center;
+        float s = TileWorldSize / Mathf.Max(b.x, b.z);
+
+        var go = new GameObject(name);
+        go.transform.SetParent(parent);
+        go.transform.localScale = new Vector3(s, s, s);
+
+        // World top of the plate = P + (c.y + b.y/2) * s, so solve that for the wanted top.
+        float topOffset = TileTopY - (c.y + b.y * 0.5f) * s;
+        go.transform.position = new Vector3(centre.x, topOffset, centre.z);
+
+        go.AddComponent<MeshFilter>().sharedMesh = mesh;
+        go.AddComponent<MeshRenderer>().sharedMaterial = mat;
+
+        var col = go.AddComponent<BoxCollider>();
+        col.size = b;               // local units; the transform scale turns this into the 2x2 footprint
+        col.center = c;
+
+        return go;
+    }
+
+    /// <summary>The player is a bare body plus a visual child, because Bob's pivot is his centre:
+    /// the visual has to be offset so his feet meet the floor, and that offset cannot live on the
+    /// root without moving the CharacterController too.
+    ///
+    /// Note the offset is measured from the controller's UNDERSIDE, not from the transform. Unity's
+    /// default CharacterController is 2 tall with its centre on the origin, so its underside sits a
+    /// full unit below the transform - standing the model on the transform would leave it hanging
+    /// in mid-air.</summary>
+    static GameObject Player(Vector3 spawn, Material mat, Mesh mesh)
+    {
+        var player = new GameObject("Test Player");
+        player.transform.position = spawn;
+        var cc = player.AddComponent<CharacterController>();
+        player.AddComponent<TestPlayer>();
+
+        var visual = new GameObject("Visual");
+        visual.transform.SetParent(player.transform, false);
+
+        float ccBottom = cc.center.y - cc.height * 0.5f;
+
+        if (mesh == null)
+        {
+            var fallback = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            fallback.name = "Visual";
+            fallback.transform.SetParent(player.transform, false);
+            Object.DestroyImmediate(fallback.GetComponent<Collider>());
+            float cs = cc.height * 0.5f;
+            fallback.transform.localPosition = new Vector3(0f, ccBottom + cc.height * 0.5f, 0f);
+            fallback.transform.localScale = new Vector3(cs, cs, cs);
+            fallback.GetComponent<Renderer>().sharedMaterial = mat;
+            return player;
+        }
+
+        Vector3 b = mesh.bounds.size;
+        Vector3 c = mesh.bounds.center;
+        float s = cc.height / Mathf.Max(0.0001f, b.y);
+
+        visual.transform.localScale = new Vector3(s, s, s);
+        // Solve localPosition.y + (c.y - b.y/2) * s = ccBottom so the lowest vertex meets the
+        // controller's underside.
+        visual.transform.localPosition = new Vector3(0f, ccBottom - (c.y - b.y * 0.5f) * s, 0f);
+
+        visual.AddComponent<MeshFilter>().sharedMesh = mesh;
+        visual.AddComponent<MeshRenderer>().sharedMaterial = mat;
+
+        return player;
+    }
+
     [MenuItem("Floating Tiles/Create Map Scene")]
     public static void Build()
     {
@@ -42,12 +159,14 @@ public static class MapBuilder
         var ring = Mat("Platform",new Color(.22f,.32f,.42f),true);
         var danger = Mat("KillPlane",new Color(.35f,.035f,.09f));
         var playerMat = Mat("Player",Color.white);
+        var tileMesh = LoadMesh(TileModelPath);
+        var playerMesh = LoadMesh(PlayerModelPath);
         var root = new GameObject("Floating Map"); var map = root.AddComponent<FloatingMap>();
         var tiles = new List<Renderer>(); var platforms = new List<Renderer>();
         for (int z = 0; z < 5; z++) for (int x = 0; x < 5; x++)
         {
             var center = new Vector3((x-2)*2.2f,0,(z-2)*2.2f);
-            var tile = Box("Tile " + (z*5+x+1).ToString("00"),center,new Vector3(2,.35f,2),black,root.transform);
+            var tile = Tile("Tile " + (z*5+x+1).ToString("00"),center,black,tileMesh,root.transform);
             tiles.Add(tile.GetComponent<Renderer>());
             for (int edge=0;edge<4;edge++)
             {
@@ -66,15 +185,22 @@ public static class MapBuilder
         var kill = Box("Kill Plane",new Vector3(0,-7,0),new Vector3(100,1,100),danger);
         kill.GetComponent<BoxCollider>().isTrigger = true; kill.AddComponent<KillPlane>();
         var body = kill.AddComponent<Rigidbody>(); body.isKinematic = true; body.useGravity = false;
-        var player = GameObject.CreatePrimitive(PrimitiveType.Capsule); player.name = "Test Player";
-        Object.DestroyImmediate(player.GetComponent<Collider>()); player.transform.position = spawn.transform.position;
-        player.GetComponent<Renderer>().sharedMaterial = playerMat; player.AddComponent<CharacterController>(); player.AddComponent<TestPlayer>();
+        Player(spawn.transform.position, playerMat, playerMesh);
         var camera = new GameObject("Main Camera").AddComponent<Camera>(); camera.tag = "MainCamera";
         camera.transform.position = new Vector3(0,18,-20); camera.transform.LookAt(Vector3.zero);
         camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.035f,.045f,.08f); camera.fieldOfView = 52;
         EditorSceneManager.SaveScene(scene,"Assets/Scenes/FloatingTiles.unity");
-        EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/FloatingTiles.unity",true) };
+
+        // Add rather than replace: assigning the array outright silently dropped every other scene
+        // from the build settings.
+        var sceneList = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+        if (!sceneList.Exists(s => s.path == "Assets/Scenes/FloatingTiles.unity"))
+            sceneList.Add(new EditorBuildSettingsScene("Assets/Scenes/FloatingTiles.unity", true));
+        EditorBuildSettings.scenes = sceneList.ToArray();
+
         AssetDatabase.SaveAssets();
-        Debug.Log("FLOATING_MAP_BUILD_OK: 25 tiles, 4 platforms, kill plane, test player.");
+        Debug.Log("FLOATING_MAP_BUILD_OK: 25 tiles, 4 platforms, kill plane, test player."
+            + (tileMesh == null ? " WARNING: Tile_t2 mesh not found." : "")
+            + (playerMesh == null ? " WARNING: Bob mesh not found." : ""));
     }
 }
