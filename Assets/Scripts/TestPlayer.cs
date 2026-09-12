@@ -18,6 +18,7 @@ public class TestPlayer : MonoBehaviour
     {
         Actor = GetComponent<TileActor>();
         if (!Actor) Actor = gameObject.AddComponent<TileActor>();
+        if (!GetComponent<PlayerPunch>()) gameObject.AddComponent<PlayerPunch>();
         Actor.DisplayName = "YOU";
         Actor.ConfigureMovement(speed, jumpHeight, launchSpeed, launchUpSpeed);
     }

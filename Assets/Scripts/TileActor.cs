@@ -160,6 +160,12 @@ public class TileActor : MonoBehaviour
         foreach (var renderer in bodyRenderers) renderer.enabled = false;
         controller.enabled = false;
     }
+    public void ReceivePunch(Vector3 impulse, float upward)
+    {
+        if (IsDead || IsLaunched) return;
+        shove = Vector3.ClampMagnitude(new Vector3(impulse.x, 0, impulse.z), 10f);
+        vertical = Mathf.Max(vertical, upward);
+    }
     public void AddShove(Vector3 impulse)
     {
         if (!IsDead && !IsLaunched) shove = Vector3.ClampMagnitude(shove + impulse, MoveSpeed * .7f);

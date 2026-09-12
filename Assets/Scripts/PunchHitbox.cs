@@ -6,6 +6,11 @@ public class PunchHitbox : MonoBehaviour
     [Header("KnockbackSettings")]
     [SerializeField] private float knockbackForce = 10f;
 
+    public void HitActor(TileActor target, Vector3 direction)
+    {
+        target.ReceivePunch(direction * knockbackForce, knockbackForce * .5f);
+    }
+
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Enemy"))

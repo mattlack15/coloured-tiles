@@ -50,7 +50,7 @@ public class TitleScreen : MonoBehaviour
         {
             GUI.Label(new Rect(80,162,800,48),"How to play",heading);
             GUI.Label(new Rect(140,223,680,260),
-                "<b>Move:</b> WASD or arrow keys\n\n" +
+                "<b>Move:</b> WASD/arrows   <b>Aim:</b> Mouse   <b>Punch:</b> Click/Enter\n\n" +
                 "Match a tile to <b>your character’s colour</b> before the timer ends. Your white outline identifies you.\n\n" +
                 "Black tiles and the edge platform disappear. Standing on a wrong colour launches you off!\n\n" +
                 "You have <b>3 lives</b>. After a fall, respawn on the edge next round. Survivors stay on their tile.",body);
