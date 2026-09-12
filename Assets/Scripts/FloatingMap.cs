@@ -363,19 +363,19 @@ public class FloatingMap : MonoBehaviour
         // Left alone, white-on-dark panels render as near-black-on-black.
         _panelTitle = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 36,
+            fontSize = 13,
             fontStyle = FontStyle.Bold,
             normal = { textColor = Color.white },
         };
         _panelBody = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 56,
+            fontSize = 19,
             fontStyle = FontStyle.Bold,
             normal = { textColor = Color.white },
         };
         _timer = new GUIStyle(GUI.skin.label)
         {
-            fontSize = 170,
+            fontSize = 42,
             fontStyle = FontStyle.Bold,
             alignment = TextAnchor.MiddleCenter,
             normal = { textColor = Color.white },
@@ -388,9 +388,9 @@ public class FloatingMap : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.6f);
         GUI.DrawTexture(r, Px);
         GUI.color = new Color(0.75f, 0.82f, 0.9f, 1f);
-        GUI.Label(new Rect(r.x + 24f, r.y + 10f, r.width - 48f, 50f), caption, _panelTitle);
+        GUI.Label(new Rect(r.x + 12f, r.y + 6f, r.width - 24f, 20f), caption, _panelTitle);
         GUI.color = valueColour;
-        GUI.Label(new Rect(r.x + 24f, r.y + 62f, r.width - 48f, 78f), value, _panelBody);
+        GUI.Label(new Rect(r.x + 12f, r.y + 27f, r.width - 24f, 28f), value, _panelBody);
         GUI.color = Color.white;
     }
 
@@ -398,6 +398,11 @@ public class FloatingMap : MonoBehaviour
     {
         if (!HasStarted || IsGameOver) return;
         EnsureHudStyles();
+        Matrix4x4 previousMatrix = GUI.matrix;
+        Color previousColour = GUI.color;
+        float hudScale = Mathf.Min(1f, Screen.width / 1280f, Screen.height / 720f);
+        float width = Screen.width / hudScale, height = Screen.height / hudScale;
+        GUI.matrix = Matrix4x4.Scale(new Vector3(hudScale, hudScale, 1));
 
         int alive = 0;
         foreach (var actor in actors) if (actor != null && !actor.IsDead) alive++;
@@ -409,12 +414,12 @@ public class FloatingMap : MonoBehaviour
         bool revealed = Revealed && colour >= 0 && colour < ColourNames.Length;
 
         // 1. top left - where we are in the round
-        Panel(new Rect(28f, 24f, 900f, 150f), "ROUND " + RoundNumber, Phase, Color.white);
+        Panel(new Rect(16f, 16f, 360f, 64f), "ROUND " + RoundNumber, Phase, Color.white);
 
         // 2. top centre - the countdown on its own, big enough to glance at
         if (Remaining > 0f)
         {
-            var timerRect = new Rect(Screen.width * 0.5f - 220f, 14f, 440f, 200f);
+            var timerRect = new Rect(width * .5f - 45f, 16f, 90f, 64f);
             GUI.color = new Color(0f, 0f, 0f, 0.5f);
             GUI.DrawTexture(timerRect, Px);
             GUI.color = Remaining < 4f ? new Color(1f, 0.55f, 0.4f) : Color.white;
@@ -423,38 +428,40 @@ public class FloatingMap : MonoBehaviour
         }
 
         // 3. top right - the state of the board
-        Panel(new Rect(Screen.width - 740f, 24f, 712f, 150f), "STILL STANDING",
+        Panel(new Rect(width - 236f, 16f, 220f, 64f), "STILL STANDING",
               alive + " / " + actors.Count + "     " + lit + " lit", Color.white);
 
         // 4. bottom right - lives, with a pip each
         int lives = player != null ? player.LivesRemaining : 0;
-        var chip = new Rect(Screen.width - 740f, Screen.height - 178f, 712f, 150f);
+        var chip = new Rect(width - 236f, height - 100f, 220f, 64f);
         Panel(chip, "LIVES", lives <= 0 ? "ELIMINATED" : lives.ToString(), Color.white);
         for (int i = 0; i < 3; i++)
         {
             GUI.color = i < lives ? new Color(0.45f, 0.9f, 0.5f) : new Color(1f, 1f, 1f, 0.18f);
-            GUI.DrawTexture(new Rect(chip.x + chip.width - 190f + i * 58f, chip.y + 74f, 44f, 44f), Px);
+            GUI.DrawTexture(new Rect(chip.x + chip.width - 88f + i * 24f, chip.y + 33f, 16f, 16f), Px);
         }
         GUI.color = Color.white;
 
         // 5. bottom left - your colour, as a chip you cannot misread
-        var colourPanel = new Rect(28f, Screen.height - 178f, 780f, 150f);
+        var colourPanel = new Rect(16f, height - 100f, 220f, 64f);
         Panel(colourPanel, "YOUR COLOUR", revealed ? ColourNames[colour] : "waiting",
               revealed ? Colours[colour] : Color.white);
         if (revealed)
         {
             GUI.color = Colours[colour];
-            GUI.DrawTexture(new Rect(colourPanel.x + colourPanel.width - 190f, colourPanel.y + 64f, 156f, 58f), Px);
+            GUI.DrawTexture(new Rect(colourPanel.x + colourPanel.width - 54f, colourPanel.y + 30f, 38f, 22f), Px);
             GUI.color = Color.white;
         }
 
         // 6. bottom centre - controls, small and out of the way
         GUI.color = new Color(1f, 1f, 1f, 0.6f);
-        GUI.Label(new Rect(0f, Screen.height - 56f, Screen.width, 52f),
+        GUI.Label(new Rect(0f, height - 28f, width, 24f),
                   "WASD: move   ·   Click/Enter: punch   ·   R: restart   ·   N: skip",
-                  new GUIStyle(_panelTitle) { fontSize = 34, alignment = TextAnchor.MiddleCenter });
+                  new GUIStyle(_panelTitle) { fontSize = 13, alignment = TextAnchor.MiddleCenter });
         GUI.color = Color.white;
 
+        GUI.matrix = previousMatrix;
+        GUI.color = previousColour;
         if (!showDebug) return;
         GUI.Box(new Rect(18,160,470,35 + bots.Count * 23), "BOT DEBUG");
         for (int i = 0; i < bots.Count; i++)
