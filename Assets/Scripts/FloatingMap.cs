@@ -24,14 +24,27 @@ public class FloatingMap : MonoBehaviour, IArena
     [Min(0)] public float initialSeconds = 3;
     [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
-    [Min(2)] public float resolveSeconds = 4;
+    [Min(2)] public float resolveSeconds = 2;
     [Min(0.01f)] public float fadeSeconds = 1;
+
+    [Tooltip("Seconds the lit board sits there before colours are handed out, so there is a beat to read it.")]
+    public float prepareSeconds = 3f;
+
+    [Header("Ramp")] 
+    [Tooltip("Move time lost each round, so the scramble tightens as the crowd thins.")]
+    public float moveSecondsRampPerRound = 0.7f;
+    [Tooltip("Floor on the move time, so it never becomes impossible.")]
+    public float minMoveSeconds = 6f;
+    [Tooltip("Lit tiles are multiplied by this every round, so safe ground gets scarcer.")]
+    [Range(0.5f, 1f)] public float litTilesRampPerRound = 0.93f;
+    [Tooltip("Floor on the lit share, so every colour always has at least one tile.")]
+    public float minLitShare = 0.08f;
 
     [Header("Tiles")]
     [Tooltip("Lit tiles relative to participant count. Tiles can be shared, so this does not cap how many people survive - it controls how far anyone travels and how hard the crowd packs onto the few safe spots. At 0.16 with 61 participants, about 10 of the 49 tiles light up.")]
     [Range(0.05f, 2f)] public float litTilesPerParticipant = 0.16f;
-    [Tooltip("Floor on the lit tile count, so a solo player still gets a real choice.")]
-    [Min(4)] public int minLitTiles = 8;
+    [Tooltip("Floor on the lit tile count. 5 is the smallest that still gives all four colours a tile.")]
+    [Min(5)] public int minLitTiles = 5;
 
     [Header("Lives")]
     [Min(1)] public int startingLives = 3;
@@ -209,7 +222,18 @@ public class FloatingMap : MonoBehaviour, IArena
     /// Participants begin scattered across the board rather than queued on the edge ring, so a round
     /// opens with everyone already in the thick of it instead of running in from outside.
     /// </summary>
-    public Vector3 RandomBoardPosition() => CellToWorld(RandomInteriorCell(0));
+    public Vector3 RandomBoardPosition()
+    {
+        // Deliberately NOT the tile centre. Bodies all snapped to grid centres look placed rather
+        // than scattered, and a perfectly centred pile has to separate on the first frame.
+        float jitter = _spacing * 0.34f;
+        return CellToWorld(RandomInteriorCell(0))
+             + new Vector3(Random.Range(-jitter, jitter), 0f, Random.Range(-jitter, jitter));
+    }
+
+    /// <summary>Move time shrinks each round, down to a floor.</summary>
+    float RoundMoveSeconds() =>
+        Mathf.Max(minMoveSeconds, moveSeconds - Mathf.Max(0, RoundNumber - 1) * moveSecondsRampPerRound);
 
     IEnumerator Countdown(float seconds)
     {
@@ -235,7 +259,12 @@ public class FloatingMap : MonoBehaviour, IArena
         for (int i = 0; i < tiles.Length; i++) { tileColours[i] = -1; tiles[i].material.color = black; }
 
         var active = ActiveParticipants();
-        int litTarget = Mathf.Clamp(Mathf.RoundToInt(active.Count * litTilesPerParticipant), minLitTiles, tiles.Length);
+
+        // Ramp: safe ground gets scarcer every round, so the crowd packs tighter and the shoving
+        // matters more as the game goes on.
+        float share = litTilesPerParticipant * Mathf.Pow(litTilesRampPerRound, Mathf.Max(0, RoundNumber - 1));
+        share = Mathf.Max(minLitShare, share);
+        int litTarget = Mathf.Clamp(Mathf.RoundToInt(active.Count * share), minLitTiles, tiles.Length);
 
         var order = new List<int>();
         for (int i = 0; i < tiles.Length; i++) order.Add(i);
@@ -252,13 +281,27 @@ public class FloatingMap : MonoBehaviour, IArena
         }
 
         Shuffle(active);
+        RebuildColourIndex();
+    }
+
+    /// <summary>
+    /// Hand out each participant's colour and tell the crowd its cycle has begun.
+    ///
+    /// Deliberately separate from Reveal. The tiles light up first and sit there while everyone
+    /// reads the board; colours only land when the running starts. Dealing both at once meant you
+    /// were already coloured during the beat you were supposed to be looking at the board.
+    /// </summary>
+    void DealColours()
+    {
+        var active = ActiveParticipants();
+        Shuffle(active);
+
         for (int i = 0; i < active.Count; i++)
         {
             active[i].Colour = i % colours.Length;
             active[i].ShowColour(colours[active[i].Colour]);
         }
 
-        RebuildColourIndex();
         CycleAdvanced?.Invoke(RoundNumber);
     }
 
@@ -348,9 +391,13 @@ public class FloatingMap : MonoBehaviour, IArena
             RespawnOutParticipants();
 
             Reveal();
+            Phase = "Get ready";
+            yield return Countdown(prepareSeconds);
+
+            DealColours();
             Phase = "Reach your target colour";
             MovementAllowed = true;
-            yield return Countdown(moveSeconds);
+            yield return Countdown(RoundMoveSeconds());
             MovementAllowed = false;
 
             SetPlatform(false);

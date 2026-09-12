@@ -12698,8 +12698,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Jam.FloatingTilesCrowd
   npcCount: 60
-  bodyRadius: 0.32
-  bodyHeight: 1.4
+  bodyRadius: 0.38
+  bodyHeight: 1.75
   speedMin: 4.6
   speedMax: 5.6
   boldShare: 0.18
@@ -12730,10 +12730,14 @@ MonoBehaviour:
   initialSeconds: 3
   moveSeconds: 15
   dropSeconds: 1
-  resolveSeconds: 4
+  resolveSeconds: 2
   fadeSeconds: 1
+  moveSecondsRampPerRound: 0.7
+  minMoveSeconds: 6
+  litTilesRampPerRound: 0.93
+  minLitShare: 0.08
   litTilesPerParticipant: 0.16
-  minLitTiles: 8
+  minLitTiles: 5
   startingLives: 3
   spawnPoint: {fileID: 1290558886}
   tiles:

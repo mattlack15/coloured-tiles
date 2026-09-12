@@ -21,8 +21,8 @@ namespace Jam
         [Header("Crowd")]
         [Tooltip("60 NPCs plus the player is 61 participants. Together with a low litTilesPerParticipant this is what makes the crowd converge instead of spreading out.")]
         public int npcCount = 60;
-        public float bodyRadius = 0.32f;
-        public float bodyHeight = 1.4f;
+        public float bodyRadius = 0.38f;
+        public float bodyHeight = 1.75f;
         [Tooltip("Deliberately close to the player's 6: the arena is only ~11 units across, so a big speed gap makes the crowd irrelevant.")]
         public float speedMin = 4.6f;
         public float speedMax = 5.6f;
