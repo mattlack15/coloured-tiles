@@ -1,6 +1,10 @@
 # Coloured Tiles
 
-A coloured-tile game being built for a game jam.
+A coloured-tile Unity game being built for a game jam.
+
+## Getting started
+
+Open this folder through Unity Hub with Unity 6000.3.24f1.
 
 ## Status
 
