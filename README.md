@@ -29,3 +29,7 @@ The Test Player exposes `Die`, `Respawn` and `LaunchOff` for this map prototype.
 C# compilation against installed Unity 2023.1 libraries passes. The repository remains configured for Unity 6; Unity 6-specific editor validation is still pending.
 
 An isolated automated Play-mode check was attempted, but Unity could not connect to its IL post-processing service. Round transitions still need a Play-mode check in the editor.
+
+## Title screen
+
+Play opens a title screen with **Start** and **Help**. Start begins the existing game; Help explains controls, character colours, tile drops and three lives. Back (or Escape) returns to the title. The player and round timer wait until Start is pressed. R reloads to the title with a fresh game. Set **Floating Map → Game Title** to replace the placeholder `GAME NAME`.
