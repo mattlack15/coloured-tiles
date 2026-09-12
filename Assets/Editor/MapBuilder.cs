@@ -41,6 +41,16 @@ public static class MapBuilder
         var outline = Mat("Outline",new Color(.4f,.65f,.75f));
         var ring = Mat("Platform",new Color(.22f,.32f,.42f),true);
         var danger = Mat("KillPlane",new Color(.35f,.035f,.09f));
+        danger.shader = Shader.Find("FloatingTiles/Lava");
+        danger.color = new Color(1,.19f,.015f);
+        var sky = Mat("StarryNight",new Color(.006f,.01f,.025f));
+        sky.shader = Shader.Find("FloatingTiles/StarryNight");
+        RenderSettings.skybox = sky;
+        // Preserve neutral scene lighting independently of the decorative night sky.
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
+        RenderSettings.ambientSkyColor = new Color(.212f,.227f,.259f);
+        RenderSettings.ambientEquatorColor = new Color(.114f,.125f,.133f);
+        RenderSettings.ambientGroundColor = new Color(.047f,.043f,.035f);
         var playerMat = Mat("Player",Color.white);
         var root = new GameObject("Floating Map"); var map = root.AddComponent<FloatingMap>();
         var tiles = new List<Renderer>(); var platforms = new List<Renderer>();
@@ -63,15 +73,15 @@ public static class MapBuilder
         platforms.Add(Box("Platform — east",new Vector3(6.4f,0,0),new Vector3(2,.35f,10.8f),ring,root.transform).GetComponent<Renderer>());
         var spawn = new GameObject("Spawn Point"); spawn.transform.position = new Vector3(0,1.3f,-6.4f); spawn.transform.SetParent(root.transform);
         map.spawnPoint = spawn.transform; map.tiles = tiles.ToArray(); map.platforms = platforms.ToArray();
-        var kill = Box("Kill Plane",new Vector3(0,-7,0),new Vector3(100,1,100),danger);
-        kill.GetComponent<BoxCollider>().isTrigger = true; kill.AddComponent<KillPlane>();
+        var kill = Box("Kill Plane",new Vector3(0,-7,0),new Vector3(36,1,36),danger);
+        kill.GetComponent<BoxCollider>().size = new Vector3(100f/36,1,100f/36); kill.GetComponent<BoxCollider>().isTrigger = true; kill.AddComponent<KillPlane>();
         var body = kill.AddComponent<Rigidbody>(); body.isKinematic = true; body.useGravity = false;
         var player = GameObject.CreatePrimitive(PrimitiveType.Capsule); player.name = "Test Player";
         Object.DestroyImmediate(player.GetComponent<Collider>()); player.transform.position = spawn.transform.position;
         player.GetComponent<Renderer>().sharedMaterial = playerMat; player.AddComponent<CharacterController>(); player.AddComponent<TestPlayer>(); player.AddComponent<PlayerOutline>();
         var camera = new GameObject("Main Camera").AddComponent<Camera>(); camera.tag = "MainCamera";
         camera.transform.position = new Vector3(0,18,-20); camera.transform.LookAt(Vector3.zero);
-        camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.035f,.045f,.08f); camera.fieldOfView = 52;
+        camera.clearFlags = CameraClearFlags.Skybox; camera.backgroundColor = new Color(.035f,.045f,.08f); camera.fieldOfView = 52;
         EditorSceneManager.SaveScene(scene,"Assets/Scenes/FloatingTiles.unity");
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/FloatingTiles.unity",true) };
         AssetDatabase.SaveAssets();

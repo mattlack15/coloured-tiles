@@ -15,6 +15,7 @@ public class TestPlayer : MonoBehaviour
     bool launched;
     Vector3 launchVelocity;
     public bool IsDead => dead;
+    public bool IsLaunched => launched;
     public int LivesRemaining { get; private set; } = 3;
     public bool IsEliminated => LivesRemaining == 0;
     MaterialPropertyBlock colourBlock;
@@ -72,5 +73,5 @@ public class TestPlayer : MonoBehaviour
         foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = true;
         controller.enabled = true;
     }
-    void OnGUI() { if (dead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), IsEliminated ? "Game over!\nPress R to restart with 3 lives." : "Life lost!\nRespawning on the edge next round."); }
+    void OnGUI() { if (dead && !IsEliminated) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), "Life lost!\nRespawning on the edge next round."); }
 }

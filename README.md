@@ -1,4 +1,4 @@
-# Coloured Tiles
+# Colour Me Surprised!
 
 Open this project in Unity **6000.3.24f1**, then open `Assets/Scenes/FloatingTiles.unity` and press Play.
 
@@ -8,7 +8,7 @@ Open this project in Unity **6000.3.24f1**, then open `Assets/Scenes/FloatingTil
 2. Four random tiles light up blue, red, yellow and green. The character turns the colour of the tile they need to reach.
 3. The player has 15 seconds to reach that colour. The edge platform is available during this time.
 4. Black tiles and their outlines disappear, and the edge platform becomes unavailable.
-5. After a one-second drop window, players above a wrong-colour tile launch upward and outward (24 units/s up, 10 units/s out). Jumping does not avoid the colour check.
+5. Throughout the time black tiles are missing, players above a wrong-colour tile launch upward and outward (24 units/s up, 10 units/s out). Jumping does not avoid the colour check.
 6. After four seconds for falls to resolve, black tiles return and coloured tiles fade to black over one second.
 7. The next round reveals new colours. The edge platform returns; dead players with lives remaining respawn there, while survivors stay on their tile.
 
@@ -32,4 +32,14 @@ An isolated automated Play-mode check was attempted, but Unity could not connect
 
 ## Title screen
 
-Play opens a title screen with **Start** and **Help**. Start begins the existing game; Help explains controls, character colours, tile drops and three lives. Back (or Escape) returns to the title. The player and round timer wait until Start is pressed. R reloads to the title with a fresh game. Set **Floating Map → Game Title** to replace the placeholder `GAME NAME`.
+Play opens a title screen with **Start** and **Help**. Start begins the existing game; Help explains controls, character colours, tile drops and three lives. Back (or Escape) returns to the title. The player and round timer wait until Start is pressed. R reloads to the title with a fresh game. The title and Game Over screens use the shared `FloatingMap.GameTitle` constant: **Colour Me Surprised!**.
+
+## Environment
+
+The kill floor uses an animated procedural lava material. A dark starry skybox surrounds the map. Edit `Assets/Generated/KillPlane.mat` and `StarryNight.mat` to adjust their colours. The visible lava floor is 36 × 36 units; its lethal trigger remains 100 × 100. Shader appearance still needs visual checking in Unity.
+
+## Game over
+
+Losing the third life immediately displays a full-screen Game Over overlay with the round reached. Play Again reloads into a fresh game with three lives; Title Screen reloads into the main menu. Round progression stops on elimination.
+
+`WAlls.obj` generates mesh colliders on import, so its placed instances block the player using the wall geometry.

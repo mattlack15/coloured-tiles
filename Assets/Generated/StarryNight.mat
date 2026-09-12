@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: KillPlane
-  m_Shader: {fileID: 4800000, guid: 0b1fa1d5d87d4e06b629eda12a4f8adb, type: 3}
+  m_Name: StarryNight
+  m_Shader: {fileID: 4800000, guid: 7ef1c2e0020346948df4529d6ca4afd4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -26,5 +26,5 @@ Material:
     m_Ints: []
     m_Floats: []
     m_Colors:
-    - _Color: {r: 1, g: 0.19, b: 0.015, a: 1}
+    - _Color: {r: 0.006, g: 0.01, b: 0.025, a: 1}
   m_BuildTextureStacks: []

@@ -4,8 +4,26 @@ using UnityEngine;
 
 public class FloatingMap : MonoBehaviour
 {
-    public string gameTitle = "GAME NAME";
+    public const string GameTitle = "Colour Me Surprised!";
     public bool HasStarted { get; private set; }
+    public bool IsGameOver => HasStarted && player && player.IsEliminated;
+    static bool restartIntoGame;
+    bool gameOverStopped;
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession() { restartIntoGame = false; }
+    public void RestartGame(bool skipTitle)
+    {
+        restartIntoGame = skipTitle;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
+    void Update()
+    {
+        if (!IsGameOver || gameOverStopped) return;
+        gameOverStopped = true;
+        StopAllCoroutines();
+        Phase = "Game over";
+        Remaining = 0;
+    }
     [Min(0)] public float initialSeconds = 10;
     [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
@@ -42,6 +60,7 @@ public class FloatingMap : MonoBehaviour
         SetPlatform(true);
         foreach (var tile in tiles) tile.material.color = black;
         if (player && spawnPoint) player.Respawn(spawnPoint.position);
+        if (restartIntoGame) { restartIntoGame = false; BeginGame(); }
     }
     public void BeginGame()
     {
@@ -50,10 +69,23 @@ public class FloatingMap : MonoBehaviour
         if (player) player.ControlsEnabled = true;
         StartCoroutine(Rounds());
     }
-    IEnumerator Countdown(float seconds)
+    IEnumerator Countdown(float seconds, bool enforceColour = false)
     {
         Remaining = seconds;
-        while (Remaining > 0) { yield return null; Remaining = Mathf.Max(0, Remaining - Time.deltaTime); }
+        while (Remaining > 0)
+        {
+            if (enforceColour) CheckPlayerColour();
+            yield return null;
+            Remaining = Mathf.Max(0, Remaining - Time.deltaTime);
+        }
+        if (enforceColour) CheckPlayerColour();
+    }
+    void CheckPlayerColour()
+    {
+        if (!player || player.IsDead || player.IsLaunched) return;
+        int tile = TileUnderPlayer();
+        if (tile >= 0 && tileColours[tile] != TargetColour)
+            player.LaunchOff(transform.position);
     }
     void SetPlatform(bool visible)
     {
@@ -122,11 +154,11 @@ public class FloatingMap : MonoBehaviour
             SetPlatform(false);
             SetBlackTiles(false);
             Phase = "Black tiles dropped";
-            yield return Countdown(dropSeconds);
-            int tile = TileUnderPlayer();
-            if (tile >= 0 && tileColours[tile] != TargetColour) player.LaunchOff(transform.position);
+            yield return Countdown(dropSeconds, true);
             Phase = "Wrong colours launch — survive";
-            yield return Countdown(resolveSeconds);
+            yield return Countdown(resolveSeconds, true);
+            // A last-moment wrong-tile entry must finish its launch before the grid resets.
+            while (player && player.IsLaunched && !player.IsDead) yield return null;
             // Settle anyone still airborne/off-grid before restoring colliders.
             // This also guarantees no falling player is rescued by a returning black tile.
             if (player && !player.IsDead && TileUnderPlayer() < 0) player.Die();
@@ -146,7 +178,7 @@ public class FloatingMap : MonoBehaviour
     void OnDestroy() { foreach (var m in owned) if (m) Destroy(m); }
     void OnGUI()
     {
-        if (!HasStarted) return;
+        if (!HasStarted || IsGameOver) return;
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
         GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart game");
