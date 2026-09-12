@@ -5420,6 +5420,8 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   speed: 6
   jumpHeight: 1.6
+  launchSpeed: 10
+  launchUpSpeed: 24
 --- !u!143 &1077868503
 CharacterController:
   m_ObjectHideFlags: 0

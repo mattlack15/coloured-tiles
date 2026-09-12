@@ -6,17 +6,35 @@ public class TestPlayer : MonoBehaviour
 {
     public float speed = 6;
     public float jumpHeight = 1.6f;
-    public float launchSpeed = 18;
-    public float launchUpSpeed = 9;
+    public float launchSpeed = 10;
+    public float launchUpSpeed = 24;
     CharacterController controller;
     float vertical;
     bool dead;
     bool launched;
     Vector3 launchVelocity;
     public bool IsDead => dead;
-    public int LivesLost { get; private set; }
+    public int LivesRemaining { get; private set; } = 3;
+    public bool IsEliminated => LivesRemaining == 0;
+    MaterialPropertyBlock colourBlock;
+    Renderer[] bodyRenderers;
     public Vector3 Feet => controller.bounds.center - Vector3.up * controller.bounds.extents.y;
-    void Awake() { controller = GetComponent<CharacterController>(); }
+    void Awake()
+    {
+        controller = GetComponent<CharacterController>();
+        bodyRenderers = GetComponentsInChildren<Renderer>();
+        colourBlock = new MaterialPropertyBlock();
+    }
+    public void SetTargetColour(Color colour)
+    {
+        foreach (var r in bodyRenderers)
+        {
+            r.GetPropertyBlock(colourBlock);
+            colourBlock.SetColor("_Color", colour);
+            colourBlock.SetColor("_BaseColor", colour);
+            r.SetPropertyBlock(colourBlock);
+        }
+    }
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.R)) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -40,16 +58,17 @@ public class TestPlayer : MonoBehaviour
     public void Die()
     {
         if (dead) return;
-        dead = true; LivesLost++;
+        dead = true; LivesRemaining = Mathf.Max(0, LivesRemaining - 1);
         controller.enabled = false;
         foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = false;
     }
     public void Respawn(Vector3 position)
     {
+        if (IsEliminated) return;
         controller.enabled = false; transform.position = position;
         vertical = -2; launchVelocity = Vector3.zero; launched = false; dead = false;
         foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = true;
         controller.enabled = true;
     }
-    void OnGUI() { if (dead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), "Life lost!\nRespawning on the edge next round."); }
+    void OnGUI() { if (dead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), IsEliminated ? "Game over!\nPress R to restart with 3 lives." : "Life lost!\nRespawning on the edge next round."); }
 }

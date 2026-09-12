@@ -20,7 +20,6 @@ public class FloatingMap : MonoBehaviour
     public int TargetColour { get; private set; }
     readonly Color black = new Color(.015f,.018f,.025f);
     readonly Color[] colours = { new Color(.05f,.35f,1), new Color(1,.08f,.12f), new Color(1,.85f,.02f), new Color(.05f,1,.3f) };
-    readonly string[] names = { "BLUE", "RED", "YELLOW", "GREEN" };
     readonly List<Material> owned = new List<Material>();
     int[] tileColours;
     Transform[] outlines;
@@ -64,6 +63,7 @@ public class FloatingMap : MonoBehaviour
             tileColours[tile] = i; tiles[tile].material.color = colours[i]; indices.RemoveAt(pick);
         }
         TargetColour = Random.Range(0, count);
+        if (player) player.SetTargetColour(colours[TargetColour]);
     }
     // Outlines are separate scene objects, so hide those over missing black tiles too.
     void SetBlackTiles(bool visible)
@@ -100,11 +100,12 @@ public class FloatingMap : MonoBehaviour
         yield return Countdown(initialSeconds);
         while (true)
         {
+            if (player && player.IsEliminated) { Phase = "Game over"; Remaining = 0; yield break; }
             RoundNumber++;
             SetPlatform(true);
             if (player && player.IsDead && spawnPoint) player.Respawn(spawnPoint.position);
             Reveal();
-            Phase = "Reach your target colour";
+            Phase = "Match your character to a tile";
             yield return Countdown(moveSeconds);
             SetPlatform(false);
             SetBlackTiles(false);
@@ -117,6 +118,7 @@ public class FloatingMap : MonoBehaviour
             // Settle anyone still airborne/off-grid before restoring colliders.
             // This also guarantees no falling player is rescued by a returning black tile.
             if (player && !player.IsDead && TileUnderPlayer() < 0) player.Die();
+            if (player && player.IsEliminated) { Phase = "Game over"; Remaining = 0; yield break; }
             SetBlackTiles(true);
             Phase = "Tiles returning to black";
             float elapsed = 0;
@@ -134,12 +136,7 @@ public class FloatingMap : MonoBehaviour
     {
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
-        if (RoundNumber > 0)
-        {
-            Color old = GUI.color; GUI.color = colours[TargetColour];
-            GUI.Label(new Rect(32,68,440,25), "YOUR TILE: " + names[TargetColour]); GUI.color = old;
-        }
         GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart game");
-        if (player) GUI.Label(new Rect(32,116,445,25), "Lives lost: " + player.LivesLost);
+        if (player) GUI.Label(new Rect(32,116,445,25), "Lives: " + player.LivesRemaining + " / 3");
     }
 }
