@@ -52,7 +52,6 @@ public class FloatingMap : MonoBehaviour
     Transform[] outlines;
     System.Random random;
     bool showDebug;
-    float currentMoveSeconds;
 
     void Awake()
     {
