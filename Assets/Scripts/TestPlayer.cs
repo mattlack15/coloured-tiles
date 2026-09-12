@@ -32,4 +32,5 @@ public class TestPlayer : MonoBehaviour
     public void Respawn(Vector3 position) { if (Actor) Actor.ResetRound(position); }
     public void LaunchOff(Vector3 centre) { if (Actor) Actor.LaunchOff(centre); }
     public void SetTargetColour(Color colour) { if (Actor) Actor.SetTint(colour); }
+    void OnGUI() { if (IsDead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), IsEliminated ? "Game over!\nPress R to restart with 3 lives." : "Life lost!\nRespawning on the edge next round."); }
 }

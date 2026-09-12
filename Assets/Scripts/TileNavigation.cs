@@ -23,7 +23,9 @@ public sealed class TileNavigation
         public readonly List<Link> links = new List<Link>();
     }
     const float Spacing = .55f;
-    const int TerrainMask = ~(1 << 2);
+    const int TerrainMask = Physics.DefaultRaycastLayers;
+    readonly RaycastHit[] groundHits = new RaycastHit[32];
+    readonly Collider[] bodyHits = new Collider[32];
     readonly List<Node> nodes = new List<Node>();
     readonly Dictionary<Vector2Int, int> cells = new Dictionary<Vector2Int, int>();
     readonly FloatingMap map;
@@ -39,7 +41,10 @@ public sealed class TileNavigation
     bool HasFloor(Vector3 p)
     {
         p.y = floorY + .35f;
-        return Physics.Raycast(p, Vector3.down, .5f, TerrainMask, QueryTriggerInteraction.Ignore);
+        int count = Physics.RaycastNonAlloc(p, Vector3.down, groundHits, .5f, TerrainMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; i++)
+            if (!groundHits[i].collider.GetComponentInParent<TileActor>()) return true;
+        return false;
     }
     public bool Walkable(Vector3 p)
     {
@@ -51,9 +56,11 @@ public sealed class TileNavigation
     }
     bool ClearBody(Vector3 feet)
     {
-        return !Physics.CheckCapsule(feet + Vector3.up * (TileActor.Radius + .035f),
+        int count = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * (TileActor.Radius + .035f),
             feet + Vector3.up * (TileActor.Height - TileActor.Radius), TileActor.Radius * .95f,
-            TerrainMask, QueryTriggerInteraction.Ignore);
+            bodyHits, TerrainMask, QueryTriggerInteraction.Ignore);
+        for (int i = 0; i < count; i++) if (!bodyHits[i].GetComponentInParent<TileActor>()) return false;
+        return count < bodyHits.Length;
     }
     public bool CanWalk(Vector3 a, Vector3 b)
     {

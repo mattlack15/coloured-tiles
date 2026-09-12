@@ -4,8 +4,8 @@ using UnityEngine;
 [RequireComponent(typeof(CharacterController))]
 public class TileActor : MonoBehaviour
 {
-    public const float Radius = .28f;
-    public const float Height = 1.05f;
+    public const float Radius = .5f;
+    public const float Height = 2f;
     public const float Speed = 6f;
     public const float JumpHeight = 1.6f;
     public const float Gravity = 20f;
@@ -25,11 +25,13 @@ public class TileActor : MonoBehaviour
     public bool Grounded => controller && controller.isGrounded;
     public Vector3 Velocity { get; private set; }
     public Vector3 CommandVelocity => IsDead || IsLaunched ? Vector3.zero : intent * MoveSpeed;
-    public Vector3 Feet => transform.position - Vector3.up * (Height * .5f);
+    public Vector3 Feet => controller.bounds.center - Vector3.up * controller.bounds.extents.y;
+    public float BodyRadius => controller.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
     public FloatingMap Map { get; set; }
     CharacterController controller;
     Material bodyMaterial;
-    Renderer bodyRenderer;
+    Renderer[] bodyRenderers;
+    MaterialPropertyBlock colourBlock;
     Vector3 intent, walking, shove;
     Vector3 launchVelocity;
     float launchSpeed = 10, launchUpSpeed = 24;
@@ -38,28 +40,24 @@ public class TileActor : MonoBehaviour
 
     void Awake()
     {
-        gameObject.layer = 2; // Navigation queries only see terrain.
         controller = GetComponent<CharacterController>();
-        controller.height = Height;
-        controller.radius = Radius;
-        controller.center = Vector3.zero;
-        controller.skinWidth = .015f;
-        controller.stepOffset = .22f;
-        controller.minMoveDistance = 0;
-        var oldVisual = GetComponent<Renderer>();
-        if (oldVisual) oldVisual.enabled = false;
-        var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        visual.name = "Body";
-        visual.layer = 2;
-        visual.transform.SetParent(transform, false);
-        visual.transform.localScale = new Vector3(Radius * 2, Height * .5f, Radius * 2);
-        var collider = visual.GetComponent<Collider>();
-        collider.enabled = false;
-        Destroy(collider);
-        bodyMaterial = new Material(Shader.Find("Unlit/Color"));
-        bodyMaterial.color = Color.white;
-        bodyRenderer = visual.GetComponent<Renderer>();
-        bodyRenderer.sharedMaterial = bodyMaterial;
+        // Preserve the human's existing renderer, transform and controller settings.
+        // New bots use a normal full-size capsule, just like the original player.
+        bodyRenderers = GetComponentsInChildren<Renderer>();
+        if (bodyRenderers.Length == 0)
+        {
+            var visual = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            visual.name = "Body";
+            visual.transform.SetParent(transform, false);
+            var collider = visual.GetComponent<Collider>();
+            collider.enabled = false;
+            Destroy(collider);
+            bodyMaterial = new Material(Shader.Find("Unlit/Color"));
+            bodyMaterial.color = Color.white;
+            visual.GetComponent<Renderer>().sharedMaterial = bodyMaterial;
+            bodyRenderers = GetComponentsInChildren<Renderer>();
+        }
+        colourBlock = new MaterialPropertyBlock();
     }
 
     public void SetInput(Vector3 direction, bool jumpPressed = false)
@@ -80,7 +78,6 @@ public class TileActor : MonoBehaviour
         Target = null;
         Result = "";
         SetInput(Vector3.zero);
-        bodyMaterial.color = Color.white;
     }
     public void ResetRound(Vector3 position)
     {
@@ -93,26 +90,34 @@ public class TileActor : MonoBehaviour
         IsDead = false;
         IsLaunched = false;
         launchVelocity = Vector3.zero;
-        bodyRenderer.enabled = true;
+        foreach (var renderer in bodyRenderers) renderer.enabled = true;
         Result = "";
         intent = walking = shove = Velocity = Vector3.zero;
-        vertical = 0;
+        vertical = -2;
         jump = false;
-        bodyMaterial.color = Color.white;
     }
     public void Assign(int colour, Renderer target, Vector3 slot, Color tint)
     {
         ColourIndex = colour;
         Target = target;
         TargetPosition = slot;
-        bodyMaterial.color = tint;
+        SetTint(tint);
     }
-    public void SetTint(Color colour) { bodyMaterial.color = colour; }
+    public void SetTint(Color colour)
+    {
+        foreach (var renderer in bodyRenderers)
+        {
+            renderer.GetPropertyBlock(colourBlock);
+            colourBlock.SetColor("_Color", colour);
+            colourBlock.SetColor("_BaseColor", colour);
+            renderer.SetPropertyBlock(colourBlock);
+        }
+    }
     public void SetStandingPosition(Vector3 position)
     {
         if (!Target) return;
         Bounds bounds = Target.bounds;
-        float margin = Radius + .08f;
+        float margin = BodyRadius - .04f;
         TargetPosition = new Vector3(Mathf.Clamp(position.x, bounds.min.x + margin, bounds.max.x - margin),
             bounds.max.y, Mathf.Clamp(position.z, bounds.min.z + margin, bounds.max.z - margin));
     }
@@ -149,8 +154,7 @@ public class TileActor : MonoBehaviour
         Result = reason;
         intent = walking = Vector3.zero;
         jump = false;
-        bodyMaterial.color = new Color(.3f, .32f, .36f);
-        bodyRenderer.enabled = false;
+        foreach (var renderer in bodyRenderers) renderer.enabled = false;
         controller.enabled = false;
     }
     public void AddShove(Vector3 impulse)
@@ -165,7 +169,8 @@ public class TileActor : MonoBehaviour
         if (jump && Grounded && !IsLaunched) vertical = Mathf.Sqrt(2 * Gravity * JumpHeightValue);
         jump = false;
         vertical -= Gravity * dt;
-        walking = Vector3.MoveTowards(walking, intent * MoveSpeed, 32 * dt);
+        // Match the original player's immediate input response. Only contact adds displacement.
+        walking = intent * MoveSpeed;
         Vector3 horizontal = IsLaunched ? launchVelocity : walking + shove;
         controller.Move((horizontal + Vector3.up * vertical) * dt);
         shove = Vector3.MoveTowards(shove, Vector3.zero, 8 * dt);
@@ -180,7 +185,7 @@ public class TileActor : MonoBehaviour
         Vector3 delta = b.transform.position - a.transform.position;
         delta.y = 0;
         float distance = delta.magnitude;
-        if (distance > Radius * 2 + .1f || distance < .001f) return;
+        if (distance > a.BodyRadius + b.BodyRadius + .1f || distance < .001f) return;
         Vector3 normal = delta / distance;
         float closing = Vector3.Dot(a.CommandVelocity - b.CommandVelocity, normal);
         if (closing <= 0) return;

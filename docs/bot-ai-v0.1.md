@@ -8,7 +8,7 @@ Bots should compete alongside human players by reaching the tile that matches th
 
 This document describes the intended first version. It is a design specification, not a record of implemented features.
 
-Implementation note: the first playable version uses seven bots and integrates the team's three-life rules. Players have 15 seconds to move; black tiles and the edge platform then disappear. After a one-second drop window, wrong-colour occupants launch upward and outward. Survivors remain on their tile, and players with lives remaining respawn on the edge next round. The roster displays each bot's preset and remaining lives. Bot traits remain stable until the game is restarted.
+Implementation note: the first playable version uses seven bots and integrates the team's three-life rules. Players have 15 seconds to move; black tiles and the edge platform then disappear. After a one-second drop window, wrong-colour occupants launch upward and outward. Survivors remain on their tile, and players with lives remaining respawn on the edge next round. The optional F3 bot debug overlay displays each bot's preset and remaining lives. The original camera, character size, HUD, tile colours, and immediate movement response are preserved. Bot traits remain stable until the game is restarted.
 
 ## Shared rules
 

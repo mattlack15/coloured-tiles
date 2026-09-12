@@ -94,6 +94,19 @@ public static class BotPlayChecks
         var bot = map.Bots[0];
         var runner = bot.GetComponent<TileActor>();
         var human = map.Human;
+        var camera = Camera.main;
+        Check(camera && !camera.orthographic && Vector3.Distance(camera.transform.position, new Vector3(0,18,-20)) < .001f
+            && Mathf.Abs(camera.fieldOfView - 52) < .001f, "Original scene camera is preserved at runtime");
+        var controller = human.GetComponent<CharacterController>();
+        Check(controller.height == 2 && controller.radius == .5f && Mathf.Abs(controller.skinWidth - .08f) < .001f
+            && Mathf.Abs(controller.stepOffset - .3f) < .001f && human.gameObject.layer == 0,
+            "Original human size, collision settings and layer are preserved");
+        Check(human.GetComponent<Renderer>().enabled && human.transform.localScale == Vector3.one
+            && human.GetComponentsInChildren<Renderer>().Length == 1, "Original human visual is retained without a replacement capsule");
+        foreach (var item in map.Bots)
+            Check(item.GetComponent<CharacterController>().radius == controller.radius
+                && item.GetComponent<CharacterController>().height == controller.height,
+                item.name + " uses the original character size");
         Prepare(map);
         foreach (var item in map.Bots) item.enabled = true;
         yield return .5f;
@@ -139,9 +152,10 @@ public static class BotPlayChecks
 
         Prepare(map, human, runner);
         map.RevealRound();
-        human.ResetRound(Above(map.tiles[12]));
+        human.ResetRound(Above(map.tiles[12]) + new Vector3(-.54f, 0, -.54f));
         runner.ResetRound(Above(map.tiles[11]));
         Assign(human, map.tiles[12]); Assign(runner, map.tiles[12]);
+        runner.SetStandingPosition(human.Feet);
         bot.ResetRound(); bot.Reveal(); bot.enabled = true;
         Vector3 occupantPosition = human.transform.position;
         yield return 3f;
@@ -150,6 +164,14 @@ public static class BotPlayChecks
 
         Prepare(map, human, runner);
         float y = originalPositions[human].y;
+        runner.gameObject.SetActive(false);
+        human.SetInput(Vector3.right);
+        human.Step(.02f);
+        Check(Mathf.Abs(human.Velocity.x - human.MoveSpeed) < .02f, "Movement reaches requested speed immediately without acceleration");
+        human.SetInput(Vector3.zero);
+        human.Step(.02f);
+        Check(Mathf.Abs(human.Velocity.x) < .02f, "Movement stops immediately without deceleration");
+        runner.gameObject.SetActive(true);
         human.ResetRound(new Vector3(-1, y, -6.4f));
         runner.ResetRound(new Vector3(0, y, -6.4f));
         human.SetInput(Vector3.right);

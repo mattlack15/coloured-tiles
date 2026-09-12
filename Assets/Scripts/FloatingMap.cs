@@ -5,7 +5,7 @@ using UnityEngine;
 public class FloatingMap : MonoBehaviour
 {
     [Min(0)] public float initialSeconds = 10;
-    [Min(.1f)] public float moveSeconds = 15;
+    [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
     [Min(2)] public float resolveSeconds = 4;
     [Min(.01f)] public float fadeSeconds = 1;
@@ -28,7 +28,7 @@ public class FloatingMap : MonoBehaviour
     public IReadOnlyList<TileActor> Actors => actors;
     public IReadOnlyList<TileBot> Bots => bots;
     public TileActor Human { get; private set; }
-    public static readonly Color[] Colours = { new Color(.08f,.45f,1), new Color(1,.16f,.22f), new Color(1,.85f,.08f), new Color(.1f,1,.4f) };
+    public static readonly Color[] Colours = { new Color(.05f,.35f,1), new Color(1,.08f,.12f), new Color(1,.85f,.02f), new Color(.05f,1,.3f) };
     public static readonly string[] ColourNames = { "BLUE", "RED", "YELLOW", "GREEN" };
     readonly List<TileActor> actors = new List<TileActor>();
     readonly List<TileBot> bots = new List<TileBot>();
@@ -38,9 +38,7 @@ public class FloatingMap : MonoBehaviour
     int[] tileColours;
     Transform[] outlines;
     System.Random random;
-    Camera gameCamera;
     bool showDebug;
-    GUIStyle titleStyle, textStyle, smallStyle, labelStyle;
 
     void Start()
     {
@@ -81,21 +79,12 @@ public class FloatingMap : MonoBehaviour
             bots.Add(bot);
         }
         BuildSpawns();
-        gameCamera = Camera.main;
-        if (gameCamera)
-        {
-            gameCamera.transform.position = new Vector3(0, 15, -11);
-            gameCamera.transform.LookAt(Vector3.zero);
-            gameCamera.orthographic = true;
-            gameCamera.orthographicSize = 8.6f;
-        }
         StartCoroutine(Rounds());
     }
     void BuildSpawns()
     {
         float y = platforms[0].bounds.max.y + TileActor.Height * .5f + .035f;
         Vector3 humanSpawn = spawnPoint ? spawnPoint.position : new Vector3(0, y, -6.4f);
-        humanSpawn.y = y;
         spawns.Add(humanSpawn);
         // Alternating sides produces crossing traffic immediately without overlapping spawns.
         Vector3[] positions = {
@@ -110,11 +99,11 @@ public class FloatingMap : MonoBehaviour
     {
         RoundNumber++;
         Revealed = Resolving = false;
-        Phase = "Get ready";
+        Phase = "All tiles black — get ready";
         for (int i = 0; i < tiles.Length; i++)
         {
             tiles[i].gameObject.SetActive(true);
-            tileMaterials[i].color = new Color(.025f,.035f,.055f);
+            tileMaterials[i].color = new Color(.015f,.018f,.025f);
             tileColours[i] = -1;
         }
         foreach (var line in outlines) line.gameObject.SetActive(true);
@@ -155,14 +144,14 @@ public class FloatingMap : MonoBehaviour
             int slot = occupancy[colour]++;
             Vector3 destination = tile.bounds.center;
             destination.y = tile.bounds.max.y;
-            // Four non-overlapping anchors fit the 2m tiles with the shared .28m radius.
-            destination.x += (slot % 2 == 0 ? -.42f : .42f);
-            destination.z += (slot / 2 == 0 ? .42f : -.42f);
+            // Start at opposite corners, leaving space for original-size characters.
+            destination.x += (slot % 2 == 0 ? -.54f : .54f);
+            destination.z += (slot == 0 || slot == 3 ? .54f : -.54f);
             actors[order[i]].Assign(colour, tile, destination, Colours[colour]);
         }
         Revealed = true;
         Remaining = moveSeconds;
-        Phase = "Find your colour";
+        Phase = "Match your character to a tile";
         foreach (var bot in bots) bot.Reveal();
     }
     public void DropBlackTiles()
@@ -216,13 +205,13 @@ public class FloatingMap : MonoBehaviour
         {
             if (actor.IsDead) continue;
             int tile = TileUnderActor(actor);
-            if (tile < 0 || actor.IsLaunched || tileColours[tile] != actor.ColourIndex) actor.Die("Life lost");
+            if (tile < 0) actor.Die("Life lost");
             else actor.MarkSafe();
         }
         if ((Human && Human.IsEliminated) || actors.TrueForAll(a => a.IsEliminated))
         {
             GameOver = true;
-            Phase = "Game over — R to restart";
+            Phase = "Game over";
             Remaining = 0;
         }
     }
@@ -261,7 +250,7 @@ public class FloatingMap : MonoBehaviour
                 elapsed += Time.deltaTime;
                 for (int i = 0; i < tiles.Length; i++)
                 {
-                    Color black = new Color(.025f,.035f,.055f);
+                    Color black = new Color(.015f,.018f,.025f);
                     tileMaterials[i].color = tileColours[i] < 0 ? black
                         : Color.Lerp(Colours[tileColours[i]], black, Mathf.Clamp01(elapsed / fadeSeconds));
                 }
@@ -271,69 +260,32 @@ public class FloatingMap : MonoBehaviour
         }
     }
     void Update() { if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug; }
-    void FixedUpdate()
+    void LateUpdate()
     {
         if (Navigation == null) return;
-        float dt = Time.fixedDeltaTime;
+        float dt = Time.deltaTime;
+        if (dt <= 0) return;
+        if (player) foreach (var actor in actors)
+            actor.ConfigureMovement(player.speed, player.jumpHeight, player.launchSpeed, player.launchUpSpeed);
         foreach (var bot in bots) if (bot.isActiveAndEnabled) bot.Tick(dt);
         foreach (var actor in actors) actor.Step(dt);
         for (int i = 0; i < actors.Count; i++) for (int j = i + 1; j < actors.Count; j++)
             TileActor.ResolveContact(actors[i], actors[j], dt);
     }
-    void Styles()
-    {
-        if (titleStyle != null) return;
-        titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold };
-        textStyle = new GUIStyle(GUI.skin.label) { fontSize = 17 };
-        smallStyle = new GUIStyle(GUI.skin.label) { fontSize = 13 };
-        labelStyle = new GUIStyle(GUI.skin.label) { fontSize = 13, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-    }
     void OnGUI()
     {
-        if (!gameCamera) return;
-        Styles();
-        float scale = Mathf.Min(Screen.width / 1280f, Screen.height / 720f);
-        Matrix4x4 previous = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(Vector3.one * scale);
-        float width = Screen.width / scale, height = Screen.height / scale;
-        GUI.Box(new Rect(20, 20, 350, 152), "");
-        GUI.Label(new Rect(34, 28, 320, 32), "COLOURED TILES  /  " + RoundNumber, titleStyle);
-        GUI.Label(new Rect(34, 66, 320, 26), Phase, textStyle);
-        string prompt = GameOver ? "R to restart with 3 lives" : Resolving ? (Human && Human.IsDead ? "Life lost · next round respawn" : "Stay on your colour")
-            : Revealed && Human ? "Reach " + ColourNames[Human.ColourIndex] + "  ·  " + Remaining.ToString("0.0") + "s"
-            : "Colour reveal in " + Mathf.CeilToInt(Remaining) + "s";
-        GUI.color = Revealed && Human && !Resolving ? Colours[Human.ColourIndex] : Color.white;
-        GUI.Label(new Rect(34, 99, 320, 30), prompt, titleStyle);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(34, 137, 320, 23), "WASD / arrows  ·  Space: jump  ·  R: restart", smallStyle);
-        GUI.Box(new Rect(width - 245, 20, 225, 50 + actors.Count * 25), "");
-        GUI.Label(new Rect(width - 230, 29, 210, 25), "ROSTER  /  LIVES", smallStyle);
-        for (int i = 0; i < actors.Count; i++)
+        GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
+        GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
+        GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart game");
+        if (player) GUI.Label(new Rect(32,116,445,25), "Lives: " + player.LivesRemaining + " / 3");
+        if (!showDebug) return;
+        GUI.Box(new Rect(18,160,470,35 + bots.Count * 23), "BOT DEBUG");
+        for (int i = 0; i < bots.Count; i++)
         {
-            var actor = actors[i];
-            GUI.color = actor.IsDead ? Color.gray : actor.ColourIndex < 0 ? Color.white : Colours[actor.ColourIndex];
-            string name = actor.DisplayName + (actor.PersonalityName.Length > 0 ? " · " + actor.PersonalityName : "");
-            GUI.Label(new Rect(width - 230, 57 + i * 25, 185, 23), name, smallStyle);
-            GUI.Label(new Rect(width - 60, 57 + i * 25, 40, 23), actor.LivesRemaining + "/3", smallStyle);
+            var actor = bots[i].GetComponent<TileActor>();
+            GUI.Label(new Rect(32,190 + i * 23,445,23), actor.DisplayName + " · " + actor.PersonalityName
+                + " · " + bots[i].State + " · lives " + actor.LivesRemaining);
         }
-        GUI.color = Color.white;
-        foreach (var actor in actors)
-        {
-            if (actor.Feet.y < -2) continue;
-            Vector3 screen = gameCamera.WorldToScreenPoint(actor.transform.position + Vector3.up * .9f);
-            if (screen.z <= 0) continue;
-            float x = screen.x / scale, y = (Screen.height - screen.y) / scale;
-            GUI.Box(new Rect(x - 31, y - 10, 62, 22), "");
-            GUI.Label(new Rect(x - 31, y - 10, 62, 22), actor.DisplayName, labelStyle);
-        }
-        if (showDebug)
-        {
-            GUI.Box(new Rect(20, height - 35 - bots.Count * 21, 490, 30 + bots.Count * 21), "");
-            for (int i = 0; i < bots.Count; i++)
-                GUI.Label(new Rect(32, height - 29 - (bots.Count - i) * 21, 470, 22),
-                    bots[i].name + ": " + bots[i].State + "  |  routes " + bots[i].Replans + "  |  push ticks " + bots[i].PushDecisions, smallStyle);
-        }
-        GUI.matrix = previous;
     }
     void OnDestroy() { foreach (var material in owned) if (material) Destroy(material); }
 }

@@ -172,7 +172,7 @@ public class TileBot : MonoBehaviour
         float best = float.PositiveInfinity;
         for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++)
         {
-            Vector3 candidate = centre + new Vector3(x * .45f, 0, z * .45f);
+            Vector3 candidate = centre + new Vector3(x * .54f, 0, z * .54f);
             float cost = Flat(candidate - actor.Feet).magnitude;
             bool clear = true;
             foreach (var other in actor.Map.Actors)
