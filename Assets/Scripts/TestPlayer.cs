@@ -59,5 +59,30 @@ public class TestPlayer : MonoBehaviour
         foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = true;
         controller.enabled = true;
     }
-    void OnGUI() { if (dead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), "Life lost!\nRespawning on the edge next round."); }
+    GUIStyle _lifeLostStyle;
+
+    void OnGUI()
+    {
+        if (!dead) return;
+
+        // normal.textColor set explicitly: GUI.skin.label ships with a DARK default text colour
+        // because it is designed for light backgrounds, and GUI.color multiplies with it.
+        if (_lifeLostStyle == null)
+        {
+            _lifeLostStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 44,
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleCenter,
+                wordWrap = true,
+                normal = { textColor = Color.white },
+            };
+        }
+
+        var box = new Rect(Screen.width * 0.5f - 440f, Screen.height * 0.5f - 110f, 880f, 220f);
+        GUI.color = new Color(0f, 0f, 0f, 0.75f);
+        GUI.DrawTexture(box, Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(box, "LIFE LOST\nRespawning on the edge next round", _lifeLostStyle);
+    }
 }

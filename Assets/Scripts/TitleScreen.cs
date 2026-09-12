@@ -6,11 +6,11 @@ public class TitleScreen : MonoBehaviour
 {
     FloatingMap map;
     bool help;
-    GUIStyle title, subtitle, heading, body, button;
+    GUIStyle title, subtitle, heading, body, button, gameOverTitle;
     void Awake() { map = GetComponent<FloatingMap>(); }
     void Update()
     {
-        if (map.HasStarted) return;
+        if (map.HasStarted && !map.GameOver) return;
         if (help && Input.GetKeyDown(KeyCode.Escape)) help = false;
     }
     void PrepareStyles()
@@ -18,6 +18,8 @@ public class TitleScreen : MonoBehaviour
         if (title != null) return;
         title = new GUIStyle(GUI.skin.label) { fontSize = 48, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
         title.normal.textColor = Color.white;
+        gameOverTitle = new GUIStyle(title) { fontSize = 76 };
+        gameOverTitle.normal.textColor = new Color(1,.32f,.22f);
         subtitle = new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
         subtitle.normal.textColor = new Color(.65f,.75f,.85f);
         heading = new GUIStyle(title) { fontSize = 28 };
@@ -25,9 +27,49 @@ public class TitleScreen : MonoBehaviour
         body.normal.textColor = new Color(.88f,.92f,.97f);
         button = new GUIStyle(GUI.skin.button) { fontSize = 24, fontStyle = FontStyle.Bold };
     }
+    /// <summary>
+    /// End-of-run screen: how far they got, and the two ways out. Drawn over everything, at the same
+    /// 960x640 design scale the title screen uses so the two screens match.
+    /// </summary>
+    void DrawGameOver()
+    {
+        PrepareStyles();
+
+        Matrix4x4 oldMatrix = GUI.matrix;
+        Color oldColour = GUI.color;
+        int oldDepth = GUI.depth;
+        GUI.depth = -100;
+
+        GUI.color = new Color(.025f,.035f,.065f,1);
+        GUI.DrawTexture(new Rect(0,0,Screen.width,Screen.height),Texture2D.whiteTexture);
+        GUI.color = Color.white;
+
+        float scale = Mathf.Min(Screen.width / 960f, Screen.height / 640f);
+        GUI.matrix = Matrix4x4.TRS(new Vector3((Screen.width-960*scale)/2,(Screen.height-640*scale)/2,0),Quaternion.identity,new Vector3(scale,scale,1));
+
+        GUI.Label(new Rect(60,65,840,55),map.gameTitle,heading);
+        GUI.Label(new Rect(60,170,840,110),"GAME OVER",gameOverTitle);
+        GUI.Label(new Rect(120,290,720,38),
+                  "All three lives lost   •   Reached round " + map.RoundNumber, subtitle);
+
+        if (GUI.Button(new Rect(300,380,360,68),"Play Again",button)) map.RestartGame(true);
+        if (GUI.Button(new Rect(300,468,360,68),"Title Screen",button)) map.RestartGame(false);
+
+        GUI.matrix = oldMatrix; GUI.color = oldColour; GUI.depth = oldDepth;
+    }
+
     void OnGUI()
     {
-        if (!map || map.HasStarted) return;
+        if (!map) return;
+
+        // The game-over screen takes the display instead of the title.
+        if (map.HasStarted && map.GameOver)
+        {
+            DrawGameOver();
+            return;
+        }
+
+        if (map.HasStarted) return;
         PrepareStyles();
         Matrix4x4 oldMatrix = GUI.matrix;
         Color oldColour = GUI.color;

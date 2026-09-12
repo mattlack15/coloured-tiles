@@ -22,7 +22,7 @@ public class FloatingMap : MonoBehaviour, IArena
 {
     [Header("Phase timing")]
     [Min(0)] public float initialSeconds = 3;
-    [Min(0)] public float moveSeconds = 15;
+    [Min(0)] public float moveSeconds = 10;
     [Min(0)] public float dropSeconds = 1;
     [Min(2)] public float resolveSeconds = 2;
     [Min(0.01f)] public float fadeSeconds = 1;
@@ -84,6 +84,22 @@ public class FloatingMap : MonoBehaviour, IArena
         HasStarted = true;
         if (player != null) player.ControlsEnabled = true;
     }
+
+    static bool restartIntoGame;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession() { restartIntoGame = false; }
+
+    /// <summary>
+    /// Reload the scene. <paramref name="skipTitle"/> jumps straight back into a round, which is what
+    /// Play Again wants; false returns to the title screen.
+    /// </summary>
+    public void RestartGame(bool skipTitle)
+    {
+        restartIntoGame = skipTitle;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
     public float Remaining { get; private set; }
     public int RoundNumber { get; private set; }
     public bool GameOver { get; private set; }
@@ -141,6 +157,8 @@ public class FloatingMap : MonoBehaviour, IArena
 
         // The title screen owns the player until Start is pressed.
         if (player != null) player.ControlsEnabled = false;
+
+        if (restartIntoGame) { restartIntoGame = false; BeginGame(); }
 
         StartCoroutine(Rounds());
     }

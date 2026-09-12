@@ -12844,7 +12844,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FloatingMap
   initialSeconds: 3
-  moveSeconds: 15
+  moveSeconds: 10
   dropSeconds: 1
   resolveSeconds: 2
   fadeSeconds: 1
