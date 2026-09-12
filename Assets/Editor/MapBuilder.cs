@@ -13,9 +13,10 @@ public static class MapBuilder
     const string TileModelPath = "Assets/Models/Tile_t2.obj";
     const string PlayerModelPath = "Assets/Models/Bob.obj";
 
-    /// <summary>Tile footprint in world units. The model is ~1.146 wide, so this is a drop-in
-    /// replacement for the old 2.0 cube: layout, colliders and the 0.2 gaps are unchanged.</summary>
-    const float TileWorldSize = 2f;
+    /// <summary>Tile footprint in world units. Must match the 2.2 grid spacing so adjacent tiles
+    /// share an edge: at anything less they share no floor, and a NavMeshAgent can never path
+    /// between them because there is nothing in the gap to walk on.</summary>
+    const float TileWorldSize = 2.2f;
 
     /// <summary>Tile top surface. Must match the platform tops (scale 0.35 centred on y=0) so the
     /// grid and the ring stay flush.</summary>
@@ -171,8 +172,12 @@ public static class MapBuilder
             for (int edge=0;edge<4;edge++)
             {
                 bool alongX = edge < 2; float sign = edge % 2 == 0 ? -1 : 1;
-                var pos = center + new Vector3(alongX ? 0 : sign*.97f,.19f,alongX ? sign*.97f : 0);
-                var line = Box("Outline",pos,alongX ? new Vector3(2,.025f,.035f) : new Vector3(.035f,.025f,2),outline,root.transform);
+                // Sit the line on the shared edge between neighbouring tiles. Nudged a hair inside
+                // so the two coincident lines do not z-fight, and the line runs the full tile
+                // length so corners meet instead of leaving notches.
+                float off = TileWorldSize * 0.5f - 0.01f;
+                var pos = center + new Vector3(alongX ? 0 : sign*off,.19f,alongX ? sign*off : 0);
+                var line = Box("Outline",pos,alongX ? new Vector3(TileWorldSize,.025f,.035f) : new Vector3(.035f,.025f,TileWorldSize),outline,root.transform);
                 Object.DestroyImmediate(line.GetComponent<Collider>());
             }
         }
