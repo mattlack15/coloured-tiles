@@ -11277,7 +11277,9 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   initialSeconds: 10
-  revealSeconds: 5
+  moveSeconds: 15
+  dropSeconds: 1
+  resolveSeconds: 4
   fadeSeconds: 1
   litTileCount: 4
   spawnPoint: {fileID: 1837308178}

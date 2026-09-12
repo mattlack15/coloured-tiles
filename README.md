@@ -1,29 +1,31 @@
 # Coloured Tiles
 
-Unity 6000.3.24f1 · 3D map prototype · no external assets
+Open this project in Unity **6000.3.24f1**, then open `Assets/Scenes/FloatingTiles.unity` and press Play.
 
-## Open
+## Round flow
 
-In Unity Hub, choose **Add project from disk** and select this repository folder. Open with Unity 6000.3.24f1. Open `Assets/Scenes/FloatingTiles.unity` and press Play. The generated scene and materials are included.
+1. The test player starts on the edge platform. All 25 tiles are black for 10 seconds at game start.
+2. Four random tiles light up blue, red, yellow and green. The HUD assigns the player one of these colours.
+3. The player has 15 seconds to reach that colour. The edge platform is available during this time.
+4. Black tiles and their outlines disappear, and the edge platform becomes unavailable.
+5. After a one-second drop window, players above a wrong-colour tile launch outward. Jumping does not avoid the colour check.
+6. After four seconds for falls to resolve, black tiles return and coloured tiles fade to black over one second.
+7. The next round reveals new colours. The edge platform returns; dead players respawn there, while survivors stay on their tile.
 
-If needed, use **Floating Tiles → Create Map Scene** to regenerate the scene. Save any other scene first: this command opens a new scene.
+The initial 10-second black phase happens only once. The player loses one life per fall and waits for the next round; there is no game-over limit yet. No multiplayer or player pushing is implemented.
 
-## Round
+## Controls and settings
 
-- 0–10 seconds: all 25 floating tiles are black with pale blue outlines. The surrounding ring is solid.
-- At 10 seconds: four distinct random tiles turn blue, red, yellow and green. Other tiles remain black.
-- At 15 seconds: the ring colliders switch off immediately. Its visual surface fades over one second, then is disabled.
-- All 25 tiles stay solid throughout. No tile removal or subsequent rounds are assumed.
-- A red kill plane below the map kills the test player. A fallback below the plane also catches falls outside it.
+WASD / arrows move; Space jumps; R restarts the entire game. The HUD shows the target colour, round, timer and lives lost.
 
-Select **Floating Map** in the Hierarchy to adjust initial seconds, reveal seconds, fade duration or lit tile count (3–4). The default uses all four colours. With three tiles, blue, red and yellow are used.
+Select **Floating Map** in the Hierarchy to adjust `Initial Seconds`, `Move Seconds`, `Drop Seconds`, `Resolve Seconds`, `Fade Seconds` and `Lit Tile Count` (3–4). Three tiles use blue/red/yellow. Targets are always selected from revealed colours. The map finds the single Test Player automatically if its Player field is empty.
 
-## Test player
+Expand **Floating Map** for tiles, outlines, platforms and Spawn Point. Kill Plane, Test Player and Main Camera are separate root objects. The edge disappears at each movement deadline to prevent using the respawn area to avoid the round.
 
-WASD / arrow keys move in world directions. Space jumps. R reloads the scene and restarts the timer, including after death. The player starts on the south platform. A fixed camera shows the whole map.
+The Test Player exposes `Die`, `Respawn` and `LaunchOff` for this map prototype. Replace this harness when integrating a full player controller. `Floating Tiles → Create Map Scene` rebuilds the scene; save other work before using it.
 
-`TestPlayer` is only a movement/death harness. `KillPlane` currently targets that component; adapt its `Die()` call when integrating your own player. `FloatingMap.spawnPoint` identifies the intended spawn location.
+## Validation
 
-## Verification
+C# compilation against installed Unity 2023.1 libraries passes. The repository remains configured for Unity 6; Unity 6-specific editor validation is still pending.
 
-All C# scripts compiled successfully against the installed Unity 2023.1 libraries; Unity 6 has not been tested locally. An automated Unity import/play test was attempted but could not run because the background editor could not connect to the local Unity licensing service. First-import scene generation, shader rendering and gameplay still require verification in the licensed Unity editor.
+An isolated automated Play-mode check was attempted, but Unity could not connect to its IL post-processing service. Round transitions still need a Play-mode check in the editor.
