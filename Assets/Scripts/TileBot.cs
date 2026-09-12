@@ -25,6 +25,8 @@ public class TileBot : MonoBehaviour
     int passingSide;
     bool recovering;
     bool reportedNoRoute;
+    bool reachedTarget;
+    float braceUntil;
     static readonly float[] Angles = { 0, 25, -25, 50, -50, 80, -80 };
 
     public void Initialize(BotPreset kind, System.Random random)
@@ -46,6 +48,8 @@ public class TileBot : MonoBehaviour
         reconsiderStandingSpotAt = 0;
         recovering = false;
         reportedNoRoute = false;
+        reachedTarget = false;
+        braceUntil = 0;
         State = "Waiting";
         actor.SetInput(Vector3.zero);
     }
@@ -97,11 +101,15 @@ public class TileBot : MonoBehaviour
         if (!actor || !actor.Map) return;
         if (actor.IsLaunched) { State = "Launched"; actor.SetInput(Vector3.zero); return; }
         if (actor.IsDead) { State = "Eliminated"; actor.SetInput(Vector3.zero); return; }
-        if (!actor.Map.Revealed || actor.Map.GameOver || !actor.Target || (actor.Map.Resolving && !actor.IsOnTarget()))
+        if (!actor.Map.Revealed || actor.Map.GameOver || !actor.Target
+            || (actor.Map.Resolving && !reachedTarget && !actor.IsOnTarget()))
         {
             State = "Waiting"; actor.SetInput(Vector3.zero); return;
         }
         if (Time.time < reactionUntil) { State = "Reacting"; actor.SetInput(Vector3.zero); return; }
+        if (actor.Grounded && actor.IsOnTarget()) reachedTarget = true;
+        // Defend before the ordinary "Holding" state, which otherwise stops all input.
+        if (DefendTile()) return;
         var nav = actor.Map.Navigation;
         Vector3 position = actor.Feet;
         MakeRoomAtDestination();
@@ -185,6 +193,53 @@ public class TileBot : MonoBehaviour
         if (State == "Avoiding") AvoidanceDecisions++;
         if (State == "Pushing") PushDecisions++;
         actor.SetInput(selected);
+    }
+    bool DefendTile()
+    {
+        if (!reachedTarget || !actor.Target.gameObject.activeSelf || actor.MoveSpeed <= 0) return false;
+        Bounds bounds = actor.Target.bounds;
+        Vector3 feet = actor.Feet;
+        // A body still supported at the lip can step back; a falling body gets no rescue force.
+        if (feet.y < bounds.max.y - .2f || feet.y > bounds.max.y + .3f
+            || feet.x < bounds.min.x - .2f || feet.x > bounds.max.x + .2f
+            || feet.z < bounds.min.z - .2f || feet.z > bounds.max.z + .2f) return false;
+
+        float margin = Mathf.Lerp(.42f, .27f, personality.riskTolerance);
+        Vector3 push = Flat(actor.PushVelocity);
+        Vector3 predicted = feet + Flat(actor.Velocity) * .2f;
+        bool approachingEdge = predicted.x < bounds.min.x + margin || predicted.x > bounds.max.x - margin
+            || predicted.z < bounds.min.z + margin || predicted.z > bounds.max.z - margin;
+        if (push.sqrMagnitude > .04f || approachingEdge) braceUntil = Time.time + .25f;
+        else if (Time.time >= braceUntil) return false;
+
+        Vector3 safe = feet;
+        safe.x = Mathf.Clamp(feet.x, bounds.min.x + margin + .08f, bounds.max.x - margin - .08f);
+        safe.z = Mathf.Clamp(feet.z, bounds.min.z + margin + .08f, bounds.max.z - margin - .08f);
+        Vector3 correction = Flat(safe - feet) * 8 - push * Mathf.Lerp(.85f, 1f, personality.assertiveness);
+        Vector3 sideways = Vector3.Cross(Vector3.up, Flat(bounds.center - feet).normalized);
+        Vector3 chosen = Vector3.ClampMagnitude(correction, actor.MoveSpeed);
+        float best = float.PositiveInfinity;
+        for (int side = -1; side <= 1; side++)
+        {
+            Vector3 candidate = Vector3.ClampMagnitude(correction + sideways * side * actor.MoveSpeed * .35f, actor.MoveSpeed);
+            Vector3 next = feet + (candidate + push) * .18f;
+            if (next.x < bounds.min.x + .12f || next.x > bounds.max.x - .12f
+                || next.z < bounds.min.z + .12f || next.z > bounds.max.z - .12f) continue;
+            float cost = (candidate - correction).sqrMagnitude * .04f;
+            foreach (var other in actor.Map.Actors)
+            {
+                if (other == actor || !other.isActiveAndEnabled || other.IsDead || other.IsLaunched) continue;
+                float overlap = Mathf.Max(0, actor.BodyRadius + other.BodyRadius
+                    - Flat(next - other.Feet - other.Velocity * .18f).magnitude);
+                cost += overlap * overlap * 5;
+            }
+            if (cost < best) { best = cost; chosen = candidate; }
+        }
+        actor.SetInput(chosen / actor.MoveSpeed);
+        State = "Bracing";
+        blockedFor = 0;
+        replanAt = 0;
+        return true;
     }
     void MakeRoomAtDestination()
     {

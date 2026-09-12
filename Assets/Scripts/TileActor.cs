@@ -24,6 +24,7 @@ public class TileActor : MonoBehaviour
     public int Score { get; private set; }
     public bool Grounded => controller && controller.isGrounded;
     public Vector3 Velocity { get; private set; }
+    public Vector3 PushVelocity => shove;
     public Vector3 CommandVelocity => IsDead || IsLaunched ? Vector3.zero : intent * MoveSpeed;
     public Vector3 Feet => controller.bounds.center - Vector3.up * controller.bounds.extents.y;
     public float BodyRadius => controller.radius * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
