@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Jam;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -112,11 +113,13 @@ public static class MapBuilder
     static GameObject Player(Vector3 spawn, Material mat, Mesh mesh)
     {
         var player = new GameObject("Test Player");
+        player.layer = GameBootstrap.PlayerLayer;
         player.transform.position = spawn;
         var cc = player.AddComponent<CharacterController>();
         player.AddComponent<TestPlayer>();
 
         var visual = new GameObject("Visual");
+        visual.layer = GameBootstrap.PlayerLayer;
         visual.transform.SetParent(player.transform, false);
 
         float ccBottom = cc.center.y - cc.height * 0.5f;
@@ -191,6 +194,24 @@ public static class MapBuilder
         kill.GetComponent<BoxCollider>().isTrigger = true; kill.AddComponent<KillPlane>();
         var body = kill.AddComponent<Rigidbody>(); body.isKinematic = true; body.useGravity = false;
         Player(spawn.transform.position, playerMat, playerMesh);
+
+        // Everything the map itself uses is unlit, so it needs no light. The crowd spawned at
+        // runtime uses the shared URP/Lit palette though, and a Lit surface with no light in the
+        // scene renders black - so the scene needs one.
+        var lightGo = new GameObject("Directional Light");
+        var light = lightGo.AddComponent<Light>();
+        light.type = LightType.Directional;
+        lightGo.transform.rotation = Quaternion.Euler(55f, 35f, 0f);
+        light.intensity = 1.1f;
+        light.color = new Color(1f, 0.97f, 0.92f);
+        light.shadows = LightShadows.Soft;
+        RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+        RenderSettings.ambientLight = new Color(0.45f, 0.45f, 0.48f);
+        RenderSettings.fog = false;
+
+        // Bakes its own navmesh over this authored geometry and spawns agents as round
+        // participants. Added here so a regenerated scene always has the crowd.
+        root.AddComponent<FloatingTilesCrowd>();
         var camera = new GameObject("Main Camera").AddComponent<Camera>(); camera.tag = "MainCamera";
         camera.transform.position = new Vector3(0,18,-20); camera.transform.LookAt(Vector3.zero);
         camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.035f,.045f,.08f); camera.fieldOfView = 52;

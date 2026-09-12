@@ -27,6 +27,14 @@ namespace Jam
         /// <summary>Whoever is running the round. Deliberately an interface, so this brain can be
         /// driven by the procedural board or by the hand-built arena's round loop.</summary>
         public ICrowdContext Game;
+
+        /// <summary>Hand-built arena rules: the map deals the colours and judges who survives, so an
+        /// agent's job is to reach a lit tile of its colour and hold it, not to chase and claim.</summary>
+        public bool HoldAndSurvive;
+
+        /// <summary>The round participant this agent represents when the map is running the show.
+        /// Its Colour is authoritative - the agent must not roll its own.</summary>
+        public TileParticipant Participant;
         public NpcTraits Traits;
         public ColorId AssignedColor;
         public int Id;
@@ -103,7 +111,16 @@ namespace Jam
         /// NPC's colour ever changes.</summary>
         void OnBeat(int beat)
         {
-            AssignedColor = Palette.NewColorDifferent(AssignedColor, ref _rng);
+            if (HoldAndSurvive && Participant != null && Participant.Colour >= 0)
+            {
+                // The map deals the colours, so rolling our own would fight it.
+                AssignedColor = (ColorId)Participant.Colour;
+            }
+            else
+            {
+                AssignedColor = Palette.NewColorDifferent(AssignedColor, ref _rng);
+            }
+
             ApplyBodyColor();
 
             ClaimedThisBeat = false;
@@ -157,8 +174,22 @@ namespace Jam
             CheckEdgeSlip(dt);
 
             // Standing on a lit tile of my colour - claim it, subject to the shared cooldown.
-            var here = Board.IsLit(cell) && Board.ColourOf(cell) == AssignedColor;
-            if (_claimCooldown <= 0f && here && cell != _lastClaimCell)
+            bool onMyColour = Board.IsLit(cell) && Board.ColourOf(cell) == AssignedColor;
+
+            if (HoldAndSurvive)
+            {
+                // Already safe: hold the tile. The map decides survival, so leaving would only
+                // risk the round, and StopAndStay (not Halt) is what keeps the hold from being
+                // undone by the player-contact check on the next frame.
+                if (onMyColour)
+                {
+                    ReleaseTarget();
+                    Loco.StopAndStay();
+                    UpdateLine();
+                    return;
+                }
+            }
+            else if (_claimCooldown <= 0f && onMyColour && cell != _lastClaimCell)
             {
                 Claim(cell);
                 return;
@@ -295,6 +326,10 @@ namespace Jam
         void Decide(bool keepUnlessClearlyBetter)
         {
             var myCell = Board.WorldToCell(transform.position);
+            // WorldToCell reports the true cell and may hand back one outside the grid (an agent on
+            // the edge platform); BFS needs a cell that exists.
+            myCell = new Vector2Int(Mathf.Clamp(myCell.x, 0, Board.Width - 1),
+                                    Mathf.Clamp(myCell.y, 0, Board.Height - 1));
             Board.BfsFrom(myCell, _scratch);
 
             float bestScore = float.NegativeInfinity;
@@ -359,7 +394,10 @@ namespace Jam
         /// </summary>
         float Score(Vector2Int tile, int distance)
         {
-            float travel = Traits.PrefersFar ? distance : -distance;
+            // Holding a tile is about arriving, so the hand-built arena always wants the NEAREST
+            // lit tile of its colour rather than the furthest one.
+            bool preferFar = Traits.PrefersFar && !HoldAndSurvive;
+            float travel = preferFar ? distance : -distance;
             float s = travel * Traits.DistanceWeight;
 
             float contest = Registry.Inbound(tile) + Registry.OccupancyAround(tile, 2) * 0.4f;

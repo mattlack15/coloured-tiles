@@ -88,6 +88,19 @@ namespace Jam
             Agent.ResetPath();
         }
 
+        /// <summary>
+        /// Stand still and STAY still. Plain <see cref="Halt"/> only lasts a frame: the player
+        /// contact check resumes any agent that still has a destination, so an agent told to hold a
+        /// tile would wander off again immediately. Clearing the destination is what makes the hold
+        /// stick, and <see cref="SetTarget"/> puts it back.
+        /// </summary>
+        public void StopAndStay()
+        {
+            _destination = transform.position;
+            _hasDestination = false;
+            Halt();
+        }
+
         void Update()
         {
             if (!Agent.enabled || !Agent.isOnNavMesh) return;

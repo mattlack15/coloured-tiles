@@ -41,6 +41,14 @@ public class FloatingMap : MonoBehaviour, IArena
     public Renderer[] platforms;
     public TestPlayer player;
 
+    /// <summary>True once the arena has built itself, so a spawner can wait for it.</summary>
+    public bool MapReady => _ready;
+
+    /// <summary>True only while participants are allowed to run for a tile. The crowd stands down
+    /// for the drop, the judgement and the reset, because there is no floor to path on and the map
+    /// alone decides who survives.</summary>
+    public bool MovementAllowed { get; private set; }
+
     public string Phase { get; private set; }
     public float Remaining { get; private set; }
     public int RoundNumber { get; private set; }
@@ -73,8 +81,10 @@ public class FloatingMap : MonoBehaviour, IArena
     /// <summary>Raised when colours are re-dealt, which is the only moment an agent's colour changes.</summary>
     public event System.Action<int> CycleAdvanced;
 
-    void Start()
+    void Awake()
     {
+        // Built here rather than in Start: another component's Start may spawn a crowd, and the
+        // crowd sizes its BFS buffers from this grid. Awake always precedes every Start.
         if (!player) player = FindAnyObjectByType<TestPlayer>();
         tileColours = new int[tiles.Length];
         for (int i = 0; i < tiles.Length; i++) { owned.Add(tiles[i].material); tileColours[i] = -1; }
@@ -83,13 +93,14 @@ public class FloatingMap : MonoBehaviour, IArena
         foreach (Transform child in transform) if (child.name == "Outline") lines.Add(child);
         outlines = lines.ToArray();
 
+        DeriveGridMetrics();
+    }
+
+    void Start()
+    {
         foreach (var platform in platforms) owned.Add(platform.material);
         SetPlatform(true);
         foreach (var tile in tiles) tile.material.color = black;
-
-        // Must run while every tile is still active: lip distance and standing height are read from
-        // tile bounds, and a dropped tile's collider reports a degenerate box.
-        DeriveGridMetrics();
 
         RegisterParticipants();
         if (player && spawnPoint) player.Respawn(spawnPoint.position);
@@ -128,8 +139,13 @@ public class FloatingMap : MonoBehaviour, IArena
     /// <summary>
     /// Anyone carrying a TileParticipant competes. A scene with none (or with only the solo player)
     /// still works: the player is wrapped automatically.
+    ///
+    /// Public because a crowd spawned after this runs needs to be added to the round; the map is the
+    /// only thing that knows the participant list, so the spawner asks it rather than reaching in.
+    /// Lives are only handed out to participants that have never been given any, so calling this
+    /// again mid-game does not resurrect anyone's lives.
     /// </summary>
-    void RegisterParticipants()
+    public void RegisterParticipants()
     {
         participants.Clear();
         participants.AddRange(FindObjectsByType<TileParticipant>(FindObjectsInactive.Include));
@@ -140,22 +156,46 @@ public class FloatingMap : MonoBehaviour, IArena
             participants.Add(wrapped);
         }
 
-        foreach (var p in participants) p.Lives = startingLives;
+        foreach (var p in participants)
+            if (p != null && p.Lives <= 0) p.Lives = startingLives;
     }
 
-    /// <summary>Spread everyone along the south edge platform. Index-ordered so they never stack.</summary>
+    /// <summary>
+    /// Where a participant waits for a round to start: spread around all four edge platforms rather
+    /// than piled onto one.
+    ///
+    /// Packing everyone onto the south platform puts them ~0.8 apart on a 2-unit-wide ledge, which
+    /// is tight enough that the shared-hazard squeeze fires before the round has even begun and
+    /// bleeds the crowd away for nothing. Four sides give roughly four times the room.
+    ///
+    /// Uses the transform's scale rather than collider bounds: EdgeSpawnPosition can be called while
+    /// the platforms are hidden, and a disabled collider reports a degenerate box.
+    /// </summary>
     public Vector3 EdgeSpawnPosition(int index, int total)
     {
-        float halfWidth = platforms.Length > 0 && platforms[0] != null
-            ? platforms[0].bounds.extents.x - 0.8f
-            : 6.5f;
-        float spacing = total > 1 ? Mathf.Min(1.0f, (halfWidth * 2f) / (total - 1)) : 0f;
-        float x = (index - (total - 1) * 0.5f) * spacing;
-        x = Mathf.Clamp(x, -halfWidth, halfWidth);
+        if (platforms == null || platforms.Length == 0)
+            return spawnPoint != null ? spawnPoint.position : Vector3.zero;
 
-        float z = spawnPoint != null ? spawnPoint.position.z : -6.4f;
-        float y = spawnPoint != null ? spawnPoint.position.y : 1.3f;
-        return new Vector3(x, y, z);
+        int sides = platforms.Length;
+        int side = ((index % sides) + sides) % sides;
+        int idx = Mathf.Max(0, index / sides);
+        int countOnSide = Mathf.Max(1, Mathf.CeilToInt(total / (float)sides));
+
+        var platform = platforms[side];
+        if (platform == null) return spawnPoint != null ? spawnPoint.position : Vector3.zero;
+
+        Vector3 centre = platform.transform.position;
+        Vector3 size = platform.transform.lossyScale;
+
+        float t = countOnSide > 1 ? idx / (float)(countOnSide - 1) - 0.5f : 0f;
+        bool longInX = size.x >= size.z;
+        float half = Mathf.Max(0f, (longInX ? size.x : size.z) * 0.5f - 0.9f);
+        float along = Mathf.Clamp(t * 2f * half, -half, half);
+
+        // Sit just above the deck; agents are snapped onto the navmesh by the spawner anyway.
+        var pos = new Vector3(centre.x, centre.y + size.y * 0.5f + 0.5f, centre.z);
+        if (longInX) pos.x += along; else pos.z += along;
+        return pos;
     }
 
     IEnumerator Countdown(float seconds)
@@ -288,7 +328,9 @@ public class FloatingMap : MonoBehaviour, IArena
 
             Reveal();
             Phase = "Reach your target colour";
+            MovementAllowed = true;
             yield return Countdown(moveSeconds);
+            MovementAllowed = false;
 
             SetPlatform(false);
             SetBlackTiles(false);
@@ -337,6 +379,7 @@ public class FloatingMap : MonoBehaviour, IArena
         SetPlatform(true);
         SetBlackTiles(true);
         for (int i = 0; i < tiles.Length; i++) tiles[i].material.color = black;
+        MovementAllowed = false;
         Phase = "Out of lives — game over.  R to restart";
         Remaining = 0;
     }
@@ -374,11 +417,19 @@ public class FloatingMap : MonoBehaviour, IArena
 
     public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < _gridW && y < _gridH;
 
+    /// <summary>
+    /// The cell a world position falls in, which may be OUT OF BOUNDS.
+    ///
+    /// Deliberately not clamped. Clamping looks harmless but silently lies: a body standing on the
+    /// edge platform, well outside the grid, resolves to the outermost row and then believes it is
+    /// standing on whatever tile happens to be there - so an agent would decide it was already safe
+    /// and never move. Callers that need a real cell must check InBounds or clamp for their purpose.
+    /// </summary>
     public Vector2Int WorldToCell(Vector3 world)
     {
         int x = Mathf.RoundToInt((world.x - _cellOrigin.x) / _spacing);
         int y = Mathf.RoundToInt((world.z - _cellOrigin.z) / _spacing);
-        return new Vector2Int(Mathf.Clamp(x, 0, _gridW - 1), Mathf.Clamp(y, 0, _gridH - 1));
+        return new Vector2Int(x, y);
     }
 
     public Vector3 CellToWorld(Vector2Int cell)
@@ -395,7 +446,8 @@ public class FloatingMap : MonoBehaviour, IArena
 
     public bool IsLit(Vector2Int cell) => InBounds(cell.x, cell.y) && tileColours[Index(cell)] >= 0;
 
-    public ColorId ColourOf(Vector2Int cell) => (ColorId)tileColours[Index(cell)];
+    /// <summary>Only meaningful for an in-bounds cell; -1 means "no colour here".</summary>
+    public ColorId ColourOf(Vector2Int cell) => IsLit(cell) ? (ColorId)tileColours[Index(cell)] : (ColorId)(-1);
 
     public IReadOnlyList<Vector2Int> TilesOfColor(ColorId c) => _tilesByColour[(int)c];
 

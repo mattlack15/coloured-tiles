@@ -15,7 +15,8 @@ namespace Jam
         /// <summary>Index into FloatingMap's palette, or -1 when unassigned.</summary>
         public int Colour = -1;
 
-        public int Lives = 3;
+        /// <summary>Set by the map on first registration; 0 means "not yet given any".</summary>
+        public int Lives;
 
         /// <summary>Out of the game for good: lives are gone.</summary>
         public bool Eliminated;
@@ -48,7 +49,6 @@ namespace Jam
         {
             Player = GetComponent<TestPlayer>();
             _renderers = GetComponentsInChildren<Renderer>(true);
-            if (Lives <= 0) Lives = 3;
         }
 
         /// <summary>Lowest point of the body, used to decide which tile is underfoot.</summary>

@@ -263,14 +263,20 @@ namespace Jam
 
         public bool IsLit(Vector2Int c) => Ready && InBounds(c.x, c.y) && _lit[c.x, c.y];
 
-        public ColorId ColourOf(Vector2Int c) => _tiles[c.x, c.y].Current;
+        /// <summary>Only meaningful for a lit, in-bounds cell; -1 when there is no colour there.</summary>
+        public ColorId ColourOf(Vector2Int c) => IsLit(c) ? _tiles[c.x, c.y].Current : (ColorId)(-1);
 
+        /// <summary>
+        /// The cell a world position falls in, which may be OUT OF BOUNDS. Deliberately not clamped,
+        /// to match FloatingMap: clamping would make a body outside the grid resolve to an edge cell
+        /// and believe it is standing on whatever tile is there.
+        /// </summary>
         public Vector2Int WorldToCell(Vector3 world)
         {
             Vector3 local = transform.InverseTransformPoint(world);
             int x = Mathf.RoundToInt(local.x / _tileSize + (Width - 1) * 0.5f);
             int y = Mathf.RoundToInt(local.z / _tileSize + (Height - 1) * 0.5f);
-            return new Vector2Int(Mathf.Clamp(x, 0, Width - 1), Mathf.Clamp(y, 0, Height - 1));
+            return new Vector2Int(x, y);
         }
 
         public Vector3 CellToWorld(Vector2Int c) => transform.TransformPoint(CellToLocal(c, 0f));
