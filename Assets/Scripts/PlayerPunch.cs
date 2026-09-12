@@ -2,23 +2,25 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-[RequireComponent(typeof(TestPlayer))]
+[RequireComponent(typeof(Player))]
 public class PlayerPunch : MonoBehaviour
 {
     public float reach = 1.7f;
     public float radius = .65f;
     public float cooldown = .55f;
-    TestPlayer player;
+    Player player;
     PunchHitbox hitbox;
     LineRenderer aim;
     Material material;
     Vector3 direction = Vector3.forward, strikeDirection;
     float readyAt, activeUntil;
+    bool requested;
+    public void RequestPunch() { requested = true; }
     readonly HashSet<TileActor> hit = new HashSet<TileActor>();
 
     void Start()
     {
-        player = GetComponent<TestPlayer>();
+        player = GetComponent<Player>();
         hitbox = gameObject.AddComponent<PunchHitbox>();
         var indicator = new GameObject("Punch Aim");
         indicator.transform.SetParent(transform, false);
@@ -55,9 +57,10 @@ public class PlayerPunch : MonoBehaviour
             Vector2 stick = Gamepad.current.rightStick.ReadValue();
             if (stick.sqrMagnitude > .04f) direction = new Vector3(stick.x, 0, stick.y).normalized;
         }
-        bool pressed = (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        bool pressed = requested || player.PunchPressed || (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             || (Keyboard.current != null && Keyboard.current.enterKey.wasPressedThisFrame)
             || (Gamepad.current != null && Gamepad.current.buttonWest.wasPressedThisFrame);
+        requested = false;
         if (pressed && Time.time >= readyAt)
         {
             readyAt = Time.time + cooldown;

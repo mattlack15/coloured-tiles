@@ -18,7 +18,7 @@ public class FloatingMap : MonoBehaviour
     public Transform spawnPoint;
     public Renderer[] tiles;
     public Renderer[] platforms;
-    public TestPlayer player;
+    public Player player;
     public string Phase { get; private set; }
     public float Remaining { get; private set; }
     public bool Revealed { get; private set; }
@@ -63,7 +63,7 @@ public class FloatingMap : MonoBehaviour
         for (int i = 0; i < tiles.Length; i++) { tileMaterials[i] = tiles[i].material; owned.Add(tileMaterials[i]); }
         platformMaterials = new Material[platforms.Length];
         for (int i = 0; i < platforms.Length; i++) { platformMaterials[i] = platforms[i].material; owned.Add(platformMaterials[i]); }
-        if (!player) player = FindFirstObjectByType<TestPlayer>();
+        if (!player) player = FindFirstObjectByType<Player>();
         if (player)
         {
             Human = player.Actor;

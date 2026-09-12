@@ -68,7 +68,7 @@ public static class MapBuilder
         var body = kill.AddComponent<Rigidbody>(); body.isKinematic = true; body.useGravity = false;
         var player = GameObject.CreatePrimitive(PrimitiveType.Capsule); player.name = "Test Player";
         Object.DestroyImmediate(player.GetComponent<Collider>()); player.transform.position = spawn.transform.position;
-        player.GetComponent<Renderer>().sharedMaterial = playerMat; player.AddComponent<CharacterController>(); player.AddComponent<TestPlayer>(); player.AddComponent<PlayerOutline>();
+        player.GetComponent<Renderer>().sharedMaterial = playerMat; player.AddComponent<CharacterController>(); player.AddComponent<Player>(); player.AddComponent<PlayerOutline>();
         var camera = new GameObject("Main Camera").AddComponent<Camera>(); camera.tag = "MainCamera";
         camera.transform.position = new Vector3(0,18,-20); camera.transform.LookAt(Vector3.zero);
         camera.clearFlags = CameraClearFlags.SolidColor; camera.backgroundColor = new Color(.035f,.045f,.08f); camera.fieldOfView = 52;
