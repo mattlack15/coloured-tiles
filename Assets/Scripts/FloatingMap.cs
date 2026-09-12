@@ -86,7 +86,7 @@ public class FloatingMap : MonoBehaviour
         }
         BuildSpawns();
         foreach (var tile in tiles) tile.material.color = new Color(.015f,.018f,.025f);
-        if (player && spawnPoint) player.Respawn(spawnPoint.position);
+        if (player && spawns.Count > 0) player.Respawn(spawns[0]);
     }
     public void BeginGame()
     {
@@ -99,6 +99,13 @@ public class FloatingMap : MonoBehaviour
     {
         float y = platforms[0].bounds.max.y + TileActor.Height * .5f + .035f;
         Vector3 humanSpawn = spawnPoint ? spawnPoint.position : new Vector3(0, y, -6.4f);
+        if (player)
+        {
+            var controller = player.GetComponent<CharacterController>();
+            Vector3 centreOffset = player.transform.TransformVector(controller.center);
+            float halfHeight = controller.height * Mathf.Abs(player.transform.lossyScale.y) * .5f;
+            humanSpawn = new Vector3(humanSpawn.x, platforms[0].bounds.max.y + halfHeight + .035f, humanSpawn.z) - centreOffset;
+        }
         spawns.Add(humanSpawn);
         // Alternating sides produces crossing traffic immediately without overlapping spawns.
         Vector3[] positions = {
