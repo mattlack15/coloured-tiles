@@ -25,6 +25,8 @@ public class TileBot : MonoBehaviour
     bool reportedNoRoute;
     bool reachedTarget;
     float braceUntil;
+    float nextPunch, punchAt;
+    TileActor punchTarget;
     static readonly float[] Angles = { 0, 25, -25, 50, -50, 80, -80 };
 
     public void Initialize(BotPreset kind, System.Random random)
@@ -35,6 +37,40 @@ public class TileBot : MonoBehaviour
         preferTileCentre = kind == BotPreset.CarefulPlanner;
         passingSide = random.Next(2) == 0 ? -1 : 1;
         actor.PersonalityName = kind == BotPreset.CarefulPlanner ? "Planner" : kind.ToString();
+    }
+    void TryPunch()
+    {
+        if (actor.IsDead || actor.IsLaunched || !actor.Grounded) { punchTarget = null; return; }
+        if (punchTarget)
+        {
+            if (Time.time < punchAt) return;
+            Vector3 delta = Flat(punchTarget.Feet - actor.Feet);
+            if (!punchTarget.IsDead && !punchTarget.IsLaunched && delta.magnitude < 1.8f
+                && Mathf.Abs(punchTarget.Feet.y - actor.Feet.y) < 1.2f && PunchClear(punchTarget))
+                punchTarget.ReceivePunch(delta.normalized * 10, 5);
+            punchTarget = null;
+            nextPunch = Time.time + Mathf.Lerp(2.6f, 1.1f, personality.assertiveness);
+            return;
+        }
+        if (Time.time < nextPunch) return;
+        float nearest = 1.7f;
+        foreach (var other in actor.Map.Actors)
+        {
+            if (other == actor || other.IsDead || other.IsLaunched || other.ColourIndex == actor.ColourIndex) continue;
+            float distance = Flat(other.Feet - actor.Feet).magnitude;
+            if (distance >= nearest || Mathf.Abs(other.Feet.y - actor.Feet.y) > 1.2f || !PunchClear(other)) continue;
+            nearest = distance;
+            punchTarget = other;
+        }
+        if (punchTarget) punchAt = Time.time + Mathf.Lerp(.4f, .22f, personality.assertiveness);
+    }
+    bool PunchClear(TileActor target)
+    {
+        Vector3 origin = actor.Feet + Vector3.up * .65f;
+        Vector3 delta = target.Feet + Vector3.up * .65f - origin;
+        foreach (var hit in Physics.RaycastAll(origin, delta.normalized, delta.magnitude, ~0, QueryTriggerInteraction.Ignore))
+            if (!hit.collider.GetComponentInParent<TileActor>()) return false;
+        return true;
     }
     public void ResetRound()
     {
@@ -48,6 +84,8 @@ public class TileBot : MonoBehaviour
         reportedNoRoute = false;
         reachedTarget = false;
         braceUntil = 0;
+        punchTarget = null;
+        nextPunch = Time.time + 1;
         State = "Waiting";
         actor.SetInput(Vector3.zero);
     }
@@ -105,6 +143,7 @@ public class TileBot : MonoBehaviour
             State = "Waiting"; actor.SetInput(Vector3.zero); return;
         }
         if (Time.time < reactionUntil) { State = "Reacting"; actor.SetInput(Vector3.zero); return; }
+        TryPunch();
         if (actor.Grounded && actor.IsOnTarget()) reachedTarget = true;
         // Defend before the ordinary "Holding" state, which otherwise stops all input.
         if (DefendTile()) return;
