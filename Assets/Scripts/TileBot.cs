@@ -6,6 +6,8 @@ public class TileBot : MonoBehaviour
 {
     public BotPreset preset;
     public BotPersonality personality;
+    [Tooltip("Prefer a spot near the tile centre when other occupants leave enough room.")]
+    public bool preferTileCentre;
     public string State { get; private set; } = "Waiting";
     public int Replans { get; private set; }
     public int AvoidanceDecisions { get; private set; }
@@ -18,6 +20,8 @@ public class TileBot : MonoBehaviour
     float jumpUntil;
     float progressSinceCheck;
     Vector3 jumpLanding;
+    Vector3 preferredStandingSpot;
+    float reconsiderStandingSpotAt;
     int passingSide;
     bool recovering;
     bool reportedNoRoute;
@@ -28,6 +32,7 @@ public class TileBot : MonoBehaviour
         actor = GetComponent<TileActor>();
         preset = kind;
         personality = BotPersonality.Create(kind, random);
+        preferTileCentre = kind == BotPreset.CarefulPlanner;
         passingSide = random.Next(2) == 0 ? -1 : 1;
         actor.PersonalityName = kind == BotPreset.CarefulPlanner ? "Planner" : kind.ToString();
     }
@@ -38,6 +43,7 @@ public class TileBot : MonoBehaviour
         reactionUntil = float.PositiveInfinity;
         replanAt = blockedFor = recoveryUntil = pushUntil = jumpUntil = 0;
         progressSinceCheck = 0;
+        reconsiderStandingSpotAt = 0;
         recovering = false;
         reportedNoRoute = false;
         State = "Waiting";
@@ -45,6 +51,14 @@ public class TileBot : MonoBehaviour
     }
     public void Reveal()
     {
+        if (actor.Target)
+        {
+            Vector3 centre = actor.Target.bounds.center;
+            centre.y = actor.Target.bounds.max.y;
+            // Keep a slight offset toward the assigned corner, rather than making
+            // every centre-preferring bot aim at precisely the same point.
+            preferredStandingSpot = Vector3.Lerp(centre, actor.TargetPosition, .4f);
+        }
         reactionUntil = Time.time + Mathf.Max(.05f, personality.reactionDelay + Random.Range(-.05f, .05f));
         State = "Reacting";
     }
@@ -175,6 +189,16 @@ public class TileBot : MonoBehaviour
     void MakeRoomAtDestination()
     {
         if (Flat(actor.TargetPosition - actor.Feet).sqrMagnitude > 6) return;
+        if (preferTileCentre && Time.time >= reconsiderStandingSpotAt)
+        {
+            reconsiderStandingSpotAt = Time.time + .6f;
+            if (Flat(preferredStandingSpot - actor.TargetPosition).sqrMagnitude > .01f
+                && StandingSpotAvailable(preferredStandingSpot))
+            {
+                actor.SetStandingPosition(preferredStandingSpot);
+                replanAt = 0;
+            }
+        }
         bool occupied = false;
         foreach (var other in actor.Map.Actors)
         {
@@ -191,6 +215,7 @@ public class TileBot : MonoBehaviour
         {
             Vector3 candidate = centre + new Vector3(x * .54f, 0, z * .54f);
             float cost = Flat(candidate - actor.Feet).magnitude;
+            if (preferTileCentre) cost += Flat(candidate - preferredStandingSpot).magnitude * 1.5f;
             bool clear = true;
             foreach (var other in actor.Map.Actors)
             {
@@ -206,6 +231,17 @@ public class TileBot : MonoBehaviour
             actor.SetStandingPosition(chosen);
             replanAt = 0;
         }
+    }
+    bool StandingSpotAvailable(Vector3 candidate)
+    {
+        foreach (var other in actor.Map.Actors)
+        {
+            if (other == actor || !other.isActiveAndEnabled || other.IsDead || other.IsLaunched) continue;
+            float spacing = actor.BodyRadius + other.BodyRadius + .03f;
+            if (Flat(other.Feet - candidate).magnitude < spacing) return false;
+            if (other.Target == actor.Target && Flat(other.TargetPosition - candidate).magnitude < spacing) return false;
+        }
+        return true;
     }
     Vector3 ChooseVelocity(Vector3 desired, bool pushing)
     {
