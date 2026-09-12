@@ -49,6 +49,12 @@ namespace Jam
         {
             Player = GetComponent<TestPlayer>();
             _renderers = GetComponentsInChildren<Renderer>(true);
+
+            // Adopt the body if one is already there. Crowd agents always carry a kinematic
+            // Rigidbody, and AddComponent returns null when one already exists - so Eject used to
+            // throw AFTER disabling the agent, leaving it to drop limply with no ejection velocity.
+            // That is what read as agents "collapsing for no reason".
+            _rigidbody = GetComponent<Rigidbody>();
         }
 
         /// <summary>Lowest point of the body, used to decide which tile is underfoot.</summary>

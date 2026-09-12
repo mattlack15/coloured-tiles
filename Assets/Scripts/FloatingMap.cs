@@ -28,8 +28,8 @@ public class FloatingMap : MonoBehaviour, IArena
     [Min(0.01f)] public float fadeSeconds = 1;
 
     [Header("Tiles")]
-    [Tooltip("Lit tiles per participant. Tiles can be shared, so this does NOT cap how many people can survive - what it controls is how far anyone has to travel and how hard the crowd converges on the few safe spots. At 0.3 with 61 participants, roughly 18 of the 49 tiles light up.")]
-    [Range(0.05f, 2f)] public float litTilesPerParticipant = 0.3f;
+    [Tooltip("Lit tiles relative to participant count. Tiles can be shared, so this does not cap how many people survive - it controls how far anyone travels and how hard the crowd packs onto the few safe spots. At 0.16 with 61 participants, about 10 of the 49 tiles light up.")]
+    [Range(0.05f, 2f)] public float litTilesPerParticipant = 0.16f;
     [Tooltip("Floor on the lit tile count, so a solo player still gets a real choice.")]
     [Min(4)] public int minLitTiles = 8;
 
@@ -103,7 +103,7 @@ public class FloatingMap : MonoBehaviour, IArena
         foreach (var tile in tiles) tile.material.color = black;
 
         RegisterParticipants();
-        if (player && spawnPoint) player.Respawn(spawnPoint.position);
+        if (player && spawnPoint) player.Respawn(RandomBoardPosition());
         StartCoroutine(Rounds());
     }
 
@@ -133,6 +133,22 @@ public class FloatingMap : MonoBehaviour, IArena
         _halfX = (_gridW - 1) * 0.5f * _spacing + halfTile;
         _halfZ = (_gridH - 1) * 0.5f * _spacing + halfTile;
 
+        // The lip is the edge of the whole walkable floor, NOT the edge of the tile grid. The ring
+        // sits flush outside the grid, so a body shoved off an edge tile just steps onto it.
+        // Measuring to the grid made the squeeze hazard drop agents standing on solid ground: one
+        // tile in they read as "at the lip" and were fired into the void beside a platform.
+        if (platforms != null)
+        {
+            foreach (var platform in platforms)
+            {
+                if (platform == null) continue;
+                Vector3 c = transform.InverseTransformPoint(platform.transform.position);
+                Vector3 s = platform.transform.lossyScale;
+                _halfX = Mathf.Max(_halfX, Mathf.Abs(c.x) + s.x * 0.5f);
+                _halfZ = Mathf.Max(_halfZ, Mathf.Abs(c.z) + s.z * 0.5f);
+            }
+        }
+
         _ready = true;
     }
 
@@ -147,56 +163,28 @@ public class FloatingMap : MonoBehaviour, IArena
     /// </summary>
     public void RegisterParticipants()
     {
+        // The player always competes, whether or not a crowd registered before this ran. Gating this
+        // on an empty list made it depend on script execution order: if the crowd's Start happened
+        // to go first, the player was never wrapped and silently sat out the whole game - no colour,
+        // no judging, no respawn.
+        if (player == null) player = FindAnyObjectByType<TestPlayer>();
+        if (player != null && player.GetComponent<TileParticipant>() == null)
+            player.gameObject.AddComponent<TileParticipant>();
+
         participants.Clear();
         participants.AddRange(FindObjectsByType<TileParticipant>(FindObjectsInactive.Include));
-
-        if (participants.Count == 0 && player != null)
-        {
-            var wrapped = player.gameObject.AddComponent<TileParticipant>();
-            participants.Add(wrapped);
-        }
 
         foreach (var p in participants)
             if (p != null && p.Lives <= 0) p.Lives = startingLives;
     }
 
     /// <summary>
-    /// Where a participant waits for a round to start: spread around all four edge platforms rather
-    /// than piled onto one.
+    /// A random spot on the tile grid, used to start everyone off.
     ///
-    /// Packing everyone onto the south platform puts them ~0.8 apart on a 2-unit-wide ledge, which
-    /// is tight enough that the shared-hazard squeeze fires before the round has even begun and
-    /// bleeds the crowd away for nothing. Four sides give roughly four times the room.
-    ///
-    /// Uses the transform's scale rather than collider bounds: EdgeSpawnPosition can be called while
-    /// the platforms are hidden, and a disabled collider reports a degenerate box.
+    /// Participants begin scattered across the board rather than queued on the edge ring, so a round
+    /// opens with everyone already in the thick of it instead of running in from outside.
     /// </summary>
-    public Vector3 EdgeSpawnPosition(int index, int total)
-    {
-        if (platforms == null || platforms.Length == 0)
-            return spawnPoint != null ? spawnPoint.position : Vector3.zero;
-
-        int sides = platforms.Length;
-        int side = ((index % sides) + sides) % sides;
-        int idx = Mathf.Max(0, index / sides);
-        int countOnSide = Mathf.Max(1, Mathf.CeilToInt(total / (float)sides));
-
-        var platform = platforms[side];
-        if (platform == null) return spawnPoint != null ? spawnPoint.position : Vector3.zero;
-
-        Vector3 centre = platform.transform.position;
-        Vector3 size = platform.transform.lossyScale;
-
-        float t = countOnSide > 1 ? idx / (float)(countOnSide - 1) - 0.5f : 0f;
-        bool longInX = size.x >= size.z;
-        float half = Mathf.Max(0f, (longInX ? size.x : size.z) * 0.5f - 0.9f);
-        float along = Mathf.Clamp(t * 2f * half, -half, half);
-
-        // Sit just above the deck; agents are snapped onto the navmesh by the spawner anyway.
-        var pos = new Vector3(centre.x, centre.y + size.y * 0.5f + 0.5f, centre.z);
-        if (longInX) pos.x += along; else pos.z += along;
-        return pos;
-    }
+    public Vector3 RandomBoardPosition() => CellToWorld(RandomInteriorCell(0));
 
     IEnumerator Countdown(float seconds)
     {
@@ -312,7 +300,7 @@ public class FloatingMap : MonoBehaviour, IArena
         foreach (var p in participants) if (p != null && p.OutThisRound && !p.Eliminated) waiting.Add(p);
 
         for (int i = 0; i < waiting.Count; i++)
-            waiting[i].RespawnAt(EdgeSpawnPosition(i, waiting.Count));
+            waiting[i].RespawnAt(RandomBoardPosition());
     }
 
     IEnumerator Rounds()

@@ -12731,7 +12731,7 @@ MonoBehaviour:
   dropSeconds: 1
   resolveSeconds: 4
   fadeSeconds: 1
-  litTilesPerParticipant: 0.3
+  litTilesPerParticipant: 0.16
   minLitTiles: 8
   startingLives: 3
   spawnPoint: {fileID: 1290558886}

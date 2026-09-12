@@ -176,7 +176,8 @@ namespace Jam
 
                 // Spread along the edge platform, then snap onto the navmesh: EdgeSpawnPosition
                 // hands back the spawn point's height, which is above the deck.
-                Vector3 pos = _map.EdgeSpawnPosition(i, npcCount);
+                // Everyone starts scattered on the board, not queued on the edge ring.
+                Vector3 pos = _map.RandomBoardPosition();
                 if (NavMesh.SamplePosition(pos, out var hit, 6f, NavMesh.AllAreas)) pos = hit.position;
                 go.transform.position = pos;
 
