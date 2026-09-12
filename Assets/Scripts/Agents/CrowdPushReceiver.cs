@@ -19,7 +19,7 @@ namespace Jam
     public class CrowdPushReceiver : MonoBehaviour
     {
         [Tooltip("How hard this body resists, relative to the crowd's 0.85 to 1.30. An overlap is split by this ratio, so 2.2 means a bot gives up roughly two thirds of the ground while you give one third - both move, you just move less.")]
-        public float PushForce = 0.55f;
+        public float PushForce = 0.45f;
 
         [Tooltip("Ceiling on how far a shove can move the body in one frame. At 60fps 0.05 is about 3 m/s.")]
         public float MaxShovePerFrame = 0.05f;
