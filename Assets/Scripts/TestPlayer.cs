@@ -4,6 +4,7 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(CharacterController))]
 public class TestPlayer : MonoBehaviour
 {
+    public bool ControlsEnabled { get; set; }
     public float speed = 6;
     public float jumpHeight = 1.6f;
     public float launchSpeed = 10;
@@ -22,6 +23,7 @@ public class TestPlayer : MonoBehaviour
     }
     void Update()
     {
+        if (!ControlsEnabled) return;
         if (Input.GetKeyDown(KeyCode.R)) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         if (!Actor) return;
         float x = (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) ? 1 : 0) - (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) ? 1 : 0);

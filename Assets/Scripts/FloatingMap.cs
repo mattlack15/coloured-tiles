@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class FloatingMap : MonoBehaviour
 {
+    public string gameTitle = "GAME NAME";
+    public bool HasStarted { get; private set; }
     [Min(0)] public float initialSeconds = 10;
     [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
@@ -40,6 +42,10 @@ public class FloatingMap : MonoBehaviour
     System.Random random;
     bool showDebug;
 
+    void Awake()
+    {
+        if (!GetComponent<TitleScreen>()) gameObject.AddComponent<TitleScreen>();
+    }
     void Start()
     {
         if (tiles == null || tiles.Length < 3 || platforms == null || platforms.Length == 0)
@@ -79,6 +85,14 @@ public class FloatingMap : MonoBehaviour
             bots.Add(bot);
         }
         BuildSpawns();
+        foreach (var tile in tiles) tile.material.color = new Color(.015f,.018f,.025f);
+        if (player && spawnPoint) player.Respawn(spawnPoint.position);
+    }
+    public void BeginGame()
+    {
+        if (HasStarted) return;
+        HasStarted = true;
+        if (player) player.ControlsEnabled = true;
         StartCoroutine(Rounds());
     }
     void BuildSpawns()
@@ -280,6 +294,7 @@ public class FloatingMap : MonoBehaviour
     }
     void OnGUI()
     {
+        if (!HasStarted) return;
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
         GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart   N: skip timer");
