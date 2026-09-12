@@ -71,6 +71,12 @@ crashlytics-build.properties
 *.app.meta
 /[Ee]xports/
 
+# --- Screenshots captured by the pi unity_capture tool ----------------------
+# These are generated verification artifacts, not source. Remove this rule if
+# you want to commit screenshots as project content.
+/[Aa]ssets/[Ss]creenshots/
+/[Aa]ssets/[Ss]creenshots.meta
+
 # --- Debug symbol leftovers -------------------------------------------------
 *.pdb
 *.mdb
