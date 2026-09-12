@@ -21,6 +21,15 @@ namespace Jam
         public Faller Faller;
         public float Speed = 4.5f;
 
+        [Tooltip("The platform is flat, so the player has no business being above this height. Guards against crowd contact lifting the capsule: CharacterController penetration recovery picks the shortest exit vector, which is sometimes straight up.")]
+        public float MaxGroundedHeight = 0.4f;
+
+        [Tooltip("Speed penalty per body being shoved. Pushing through the crowd must not be free, or the crowd stops being a cost at all.")]
+        public float PushCostPerBody = 0.25f;
+
+        [Tooltip("Debug only: forces a movement direction and ignores the keyboard. Zero means normal input. Lets the player be driven from the editor or a test harness.")]
+        public Vector2 debugDrive;
+
         public ColorId AssignedColor { get; private set; }
         public int Claims { get; private set; }
         public bool ClaimedThisBeat { get; private set; }
@@ -76,14 +85,17 @@ namespace Jam
 
             if (_claimCooldown > 0f) _claimCooldown -= Time.deltaTime;
 
-            Vector2 input = Vector2.zero;
-            var kb = Keyboard.current;
-            if (kb != null)
+            Vector2 input = debugDrive;
+            if (input.sqrMagnitude < 0.0001f)
             {
-                if (kb.wKey.isPressed) input.y += 1f;
-                if (kb.sKey.isPressed) input.y -= 1f;
-                if (kb.aKey.isPressed) input.x -= 1f;
-                if (kb.dKey.isPressed) input.x += 1f;
+                var kb = Keyboard.current;
+                if (kb != null)
+                {
+                    if (kb.wKey.isPressed) input.y += 1f;
+                    if (kb.sKey.isPressed) input.y -= 1f;
+                    if (kb.aKey.isPressed) input.x -= 1f;
+                    if (kb.dKey.isPressed) input.x += 1f;
+                }
             }
             if (input.sqrMagnitude > 1f) input.Normalize();
 
@@ -91,9 +103,14 @@ namespace Jam
 
             if (Game.RoundActive)
             {
-                float speed = Speed * DensityFactor();
+                float speed = Speed * DensityFactor() * PushFactor();
                 _cc.SimpleMove(new Vector3(input.x, 0f, input.y) * speed);
             }
+
+            // Never let the crowd carry us upward. Several kinematic NPC bodies overlapping the
+            // capsule at once can resolve by lifting it, which reads as the player floating.
+            if ((Faller == null || !Faller.IsAirborne) && transform.position.y > MaxGroundedHeight)
+                transform.position = new Vector3(transform.position.x, MaxGroundedHeight, transform.position.z);
 
             // Walked past the lip: nothing under us any more.
             if (transform.position.y < -1.2f)
@@ -122,6 +139,15 @@ namespace Jam
                                                   _overlap, _npcMask, QueryTriggerInteraction.Ignore);
             float excess = Mathf.Max(0f, n - Game.densitySlowdownAt);
             return 1f / (1f + excess * Game.densitySlowdownPerBody);
+        }
+
+        /// <summary>Cost of shoving bodies out of the way. Without this, "you can push through the
+        /// crowd" would mean the crowd costs you nothing, which removes the entire premise.</summary>
+        float PushFactor()
+        {
+            int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, 0.95f,
+                                                  _overlap, _npcMask, QueryTriggerInteraction.Ignore);
+            return 1f / (1f + Mathf.Max(0, n - 1) * PushCostPerBody);
         }
 
         void Claim(Vector2Int cell)

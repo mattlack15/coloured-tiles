@@ -54,6 +54,8 @@ namespace Jam
         [Range(0f, 1f)] public float drifterShare = 0.22f;
         [Tooltip("Off: NPCs walk into the player and press. On: the player carves the navmesh when stationary, so NPCs route around it.")]
         public bool avoidPlayer = false;
+        [Tooltip("The player's force advantage over the crowd. How fast an NPC slides aside when you walk into it. Higher = you bulldoze through people.")]
+        public float playerPushSpeed = 2.2f;
         [Tooltip("Off (recommended): NPC/NPC collision is handled by RVO only. On: hard physics bodies, more jitter and deadlocks.")]
         public bool npcPhysicsCollisions = false;
 
@@ -103,6 +105,7 @@ namespace Jam
         Transform _agentsRoot;
         NavMeshObstacle _playerObstacle;
         Faller _playerFaller;
+        CharacterController _playerBody;
         int _spawnedNpcs;
 
         void Awake()
@@ -116,6 +119,12 @@ namespace Jam
             CleanupStaleBuild();
 
             Physics.IgnoreLayerCollision(NpcLayer, NpcLayer, !npcPhysicsCollisions);
+            // The player does not participate in ANY agent-agent physics. That is what makes them
+            // immovable by the crowd: penetration recovery can only ever push someone, and if the
+            // player is not a collision participant there is nobody to push them. NPCs resolve
+            // their own overlap with the player in NpcLocomotion instead, which gives the player
+            // the force advantage for free.
+            Physics.IgnoreLayerCollision(PlayerLayer, NpcLayer, true);
 
             BuildBoard();
             BuildNavMesh();
@@ -230,6 +239,7 @@ namespace Jam
             cc.center = new Vector3(0f, 0.75f, 0f);
             cc.slopeLimit = 45f;
             cc.stepOffset = 0.3f;
+            _playerBody = cc;
 
             // Off by default: only the fall uses physics, so the CharacterController never has to
             // share a transform with a live Rigidbody.
@@ -308,6 +318,8 @@ namespace Jam
                 loco.PlayerMask = 1 << PlayerLayer;
                 loco.NpcMask = 1 << NpcLayer;
                 loco.PressAgainstPlayer = true;
+                loco.PlayerPushSpeed = playerPushSpeed;
+                loco.PlayerBody = _playerBody;
 
                 var body = CreateBody(root.transform, NpcLayer, bodyRadius * 2f, bodyHeight * 0.5f, bodyRadius * 2f, true);
                 var line = CreateTargetLine(root.transform);

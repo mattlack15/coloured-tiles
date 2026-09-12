@@ -44,6 +44,7 @@ namespace Jam
         float _stuckTimer;
         float _slipTimer;
         float _claimCooldown;
+        float _navmeshGrace;
         uint _rng;
         Vector3 _lastPos;
         Vector3 _approachOffset;
@@ -75,6 +76,7 @@ namespace Jam
             _lastPos = transform.position;
             _reactTimer = Palette.Hash01(ref _rng) * traits.ReactionDelay;
             _reconsiderTimer = traits.ReconsiderInterval;
+            _navmeshGrace = 1f;
             // Blocks a free claim on the spawn tile: they have to actually move for their first point.
             _lastClaimCell = board.WorldToCell(transform.position);
 
@@ -133,6 +135,18 @@ namespace Jam
             var cell = Board.WorldToCell(transform.position);
             UpdateOccupancy(cell);
             TrackProgress(dt);
+
+            // Shoved clean off the navmesh (bulldozed over the lip by the player, say). The agent
+            // can no longer path, so without this it would stand in mid-air forever.
+            _navmeshGrace -= dt;
+            if (_navmeshGrace <= 0f && Loco.Agent != null && Loco.Agent.enabled && !Loco.Agent.isOnNavMesh)
+            {
+                ReleaseTarget();
+                ReleaseOccupancy();
+                Faller.BeginFall(new Vector3(0f, 0.5f, 0f));
+                Game.OnNpcFall(this);
+                return;
+            }
 
             // Squeezed against the lip? The crowd can put you over the side.
             CheckEdgeSlip(dt);
@@ -258,6 +272,7 @@ namespace Jam
             _lastClaimCell = cell;
             _occupancyCell = new Vector2Int(-1, -1);
             _claimCooldown = 0f;
+            _navmeshGrace = 1f;
             _reactTimer = 0f;
             _reconsiderTimer = Traits.ReconsiderInterval;
             _stuckTimer = 0f;
