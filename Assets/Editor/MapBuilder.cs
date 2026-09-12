@@ -53,6 +53,28 @@ public static class MapBuilder
         return m;
     }
 
+    /// <summary>
+    /// A lit material, matching the crowd. The rest of this map is unlit, but the player is drawn
+    /// with the same URP/Lit shading as the capsules so he reads as the same kind of object rather
+    /// than a flat cutout sitting among them.
+    /// </summary>
+    static Material MatLit(string name, Color color)
+    {
+        string path = "Assets/Generated/" + name + ".mat";
+        var m = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (m == null)
+        {
+            m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            AssetDatabase.CreateAsset(m, path);
+        }
+        if (m.shader == null || m.shader.name != "Universal Render Pipeline/Lit")
+            m.shader = Shader.Find("Universal Render Pipeline/Lit");
+        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", color);
+        m.color = color;
+        EditorUtility.SetDirty(m);
+        return m;
+    }
+
     static GameObject Box(string name, Vector3 pos, Vector3 scale, Material mat, Transform parent = null)
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube); go.name = name;
@@ -132,6 +154,20 @@ public static class MapBuilder
         var push = player.AddComponent<CrowdPushReceiver>();
         push.NpcMask = 1 << GameBootstrap.NpcLayer;
 
+        // Punch, ported from the playerLogic branch: a hitbox parked ahead of the player and armed
+        // for a short window by a press.
+        var punchGo = new GameObject("PlayerPunch");
+        punchGo.transform.SetParent(player.transform, false);
+        var punchSphere = punchGo.AddComponent<SphereCollider>();
+        punchSphere.isTrigger = true;
+        punchSphere.radius = 0.9f;
+        var punchHitbox = punchGo.AddComponent<PunchHitbox>();
+        punchHitbox.TargetMask = 1 << GameBootstrap.NpcLayer;
+        var playerPunch = player.AddComponent<PlayerPunch>();
+        playerPunch.Hitbox = punchHitbox;
+        playerPunch.TargetMask = 1 << GameBootstrap.NpcLayer;
+        punchGo.SetActive(false);
+
         var visual = new GameObject("Visual");
         visual.layer = GameBootstrap.PlayerLayer;
         visual.transform.SetParent(player.transform, false);
@@ -182,7 +218,7 @@ public static class MapBuilder
         var outline = Mat("Outline",new Color(.4f,.65f,.75f));
         var ring = Mat("Platform",new Color(.22f,.32f,.42f),true);
         var danger = Mat("KillPlane",new Color(.35f,.035f,.09f));
-        var playerMat = Mat("Player",Color.white);
+        var playerMat = MatLit("Player",Color.white);
         var tileMesh = LoadMesh(TileModelPath);
         var playerMesh = LoadMesh(PlayerModelPath);
         var root = new GameObject("Floating Map"); var map = root.AddComponent<FloatingMap>();

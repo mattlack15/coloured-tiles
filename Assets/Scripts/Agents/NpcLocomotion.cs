@@ -70,6 +70,13 @@ namespace Jam
         bool _shovedThisFrame;
         float _sidestepTimer;
 
+        /// <summary>A punch's remaining displacement per second. Decays to nothing in a fraction of
+        /// a second, so a hit reads as a knockback rather than a teleport.</summary>
+        Vector3 _punchVelocity;
+
+        [Tooltip("How fast a punch's knockback bleeds off, in m/s per second. A speed of 11 decaying at 16 carries a body about 3.8 metres.")]
+        public float PunchDecay = 16f;
+
         readonly Collider[] _others = new Collider[24];
 
         public bool IsHalted => _halted;
@@ -117,6 +124,7 @@ namespace Jam
 
             float dt = Time.deltaTime;
             _shovedThisFrame = false;
+            ApplyPunch(dt);
             ResolveShoves(dt);
 
             // Always, NOT only when the agent has a destination. Holding a tile is the state most of
@@ -125,6 +133,28 @@ namespace Jam
             // Bob. Only the path RESUME needs a destination; the separation does not.
             HandlePlayerContact(dt);
             FightHeadOn(dt);
+        }
+
+        /// <summary>
+        /// Take a punch. Delivered as a decaying displacement rather than an impulse force, because
+        /// this body is a kinematic agent: the only thing that can move it is Agent.Move.
+        ///
+        /// It deliberately does NOT respect the shove force comparison. A punch is not a shove - it
+        /// beats anyone, which is what makes it a verb the player chooses rather than a consequence
+        /// of relative mass.
+        /// </summary>
+        public void Punch(Vector3 direction, float speed)
+        {
+            _punchVelocity = direction.normalized * speed;
+        }
+
+        void ApplyPunch(float dt)
+        {
+            if (_punchVelocity.sqrMagnitude < 0.0001f) return;
+
+            if (Agent.enabled && Agent.isOnNavMesh) Agent.Move(_punchVelocity * dt);
+
+            _punchVelocity = Vector3.MoveTowards(_punchVelocity, Vector3.zero, PunchDecay * dt);
         }
 
         /// <summary>
