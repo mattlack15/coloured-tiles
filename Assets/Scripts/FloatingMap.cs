@@ -630,6 +630,10 @@ public class FloatingMap : MonoBehaviour, IArena
 
     void OnGUI()
     {
+        // Nothing while the title screen or the game-over screen owns the display. Without this the
+        // panels draw straight through the title screen, which reads as a broken menu.
+        if (!HasStarted || GameOver) return;
+
         EnsureHudStyles();
 
         var own = player != null ? player.GetComponent<TileParticipant>() : null;
