@@ -259,7 +259,11 @@ public class FloatingMap : MonoBehaviour
             BeginRound();
         }
     }
-    void Update() { if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug; }
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug;
+        if (Input.GetKeyDown(KeyCode.N)) Remaining = 0;
+    }
     void LateUpdate()
     {
         if (Navigation == null) return;
@@ -276,7 +280,7 @@ public class FloatingMap : MonoBehaviour
     {
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
-        GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart game");
+        GUI.Label(new Rect(32,93,445,25), "WASD / arrows: move   Space: jump   R: restart   N: skip timer");
         if (player) GUI.Label(new Rect(32,116,445,25), "Lives: " + player.LivesRemaining + " / 3");
         if (!showDebug) return;
         GUI.Box(new Rect(18,160,470,35 + bots.Count * 23), "BOT DEBUG");

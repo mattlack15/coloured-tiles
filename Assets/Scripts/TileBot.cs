@@ -20,6 +20,7 @@ public class TileBot : MonoBehaviour
     Vector3 jumpLanding;
     int passingSide;
     bool recovering;
+    bool reportedNoRoute;
     static readonly float[] Angles = { 0, 25, -25, 50, -50, 80, -80 };
 
     public void Initialize(BotPreset kind, System.Random random)
@@ -38,6 +39,7 @@ public class TileBot : MonoBehaviour
         replanAt = blockedFor = recoveryUntil = pushUntil = jumpUntil = 0;
         progressSinceCheck = 0;
         recovering = false;
+        reportedNoRoute = false;
         State = "Waiting";
         actor.SetInput(Vector3.zero);
     }
@@ -61,6 +63,11 @@ public class TileBot : MonoBehaviour
     void Plan(bool urgent)
     {
         actor.Map.Navigation.FindPath(actor, actor.TargetPosition, personality, urgent, route);
+        if (route.Count == 0 && !reportedNoRoute)
+        {
+            Debug.Log($"BOT_ROUTE_DIAGNOSTIC {name}: {actor.Map.Navigation.LastFailure} grounded={actor.Grounded}");
+            reportedNoRoute = true;
+        }
         waypoint = 0;
         Replans++;
         if (!urgent && RouteDistance() / actor.MoveSpeed + .4f > actor.Map.Remaining)
@@ -102,7 +109,7 @@ public class TileBot : MonoBehaviour
         }
         bool urgent = targetDelta.magnitude / actor.MoveSpeed + .8f >= actor.Map.Remaining;
         bool pushing = urgent || Time.time < pushUntil;
-        if (Time.time >= replanAt && actor.Grounded) Plan(pushing);
+        if (Time.time >= replanAt && (actor.Grounded || nav.Walkable(position))) Plan(pushing);
         if (route.Count == 0)
         {
             State = "No route";

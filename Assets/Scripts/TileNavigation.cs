@@ -23,6 +23,8 @@ public sealed class TileNavigation
         public readonly List<Link> links = new List<Link>();
     }
     const float Spacing = .55f;
+    // Reach across the entire .2m seam even when the centre is close to one edge.
+    const float SupportReach = TileActor.Radius * .6f;
     const int TerrainMask = Physics.DefaultRaycastLayers;
     readonly RaycastHit[] groundHits = new RaycastHit[32];
     readonly Collider[] bodyHits = new Collider[32];
@@ -31,6 +33,7 @@ public sealed class TileNavigation
     readonly FloatingMap map;
     readonly float floorY;
     public int NodeCount => nodes.Count;
+    public string LastFailure { get; private set; }
 
     public TileNavigation(FloatingMap map)
     {
@@ -50,12 +53,12 @@ public sealed class TileNavigation
     {
         p.y = floorY;
         bool support = HasFloor(p) ||
-            (HasFloor(p + Vector3.right * .18f) && HasFloor(p - Vector3.right * .18f)) ||
-            (HasFloor(p + Vector3.forward * .18f) && HasFloor(p - Vector3.forward * .18f)) ||
+            (HasFloor(p + Vector3.right * SupportReach) && HasFloor(p - Vector3.right * SupportReach)) ||
+            (HasFloor(p + Vector3.forward * SupportReach) && HasFloor(p - Vector3.forward * SupportReach)) ||
             // Four tiles meet around a tiny cross-shaped gap. Opposite diagonal
             // contacts support the capsule even when all cardinal probes miss.
-            (HasFloor(p + new Vector3(.18f, 0, .18f)) && HasFloor(p - new Vector3(.18f, 0, .18f))) ||
-            (HasFloor(p + new Vector3(.18f, 0, -.18f)) && HasFloor(p - new Vector3(.18f, 0, -.18f)));
+            (HasFloor(p + new Vector3(SupportReach, 0, SupportReach)) && HasFloor(p - new Vector3(SupportReach, 0, SupportReach))) ||
+            (HasFloor(p + new Vector3(SupportReach, 0, -SupportReach)) && HasFloor(p - new Vector3(SupportReach, 0, -SupportReach)));
         return support && ClearBody(p);
     }
     bool ClearBody(Vector3 feet)
@@ -147,8 +150,13 @@ public sealed class TileNavigation
     public bool FindPath(TileActor actor, Vector3 destination, BotPersonality personality, bool urgent, List<Waypoint> output)
     {
         output.Clear();
+        LastFailure = null;
         int start = Nearest(actor.Feet), end = Nearest(destination);
-        if (start < 0 || end < 0) return false;
+        if (start < 0 || end < 0)
+        {
+            LastFailure = $"start={start} end={end} feet={actor.Feet} destination={destination} walkable={Walkable(actor.Feet)}";
+            return false;
+        }
         int count = nodes.Count;
         var cost = new float[count];
         var crowd = new float[count];
@@ -205,6 +213,7 @@ public sealed class TileNavigation
                 jump[link.to] = link.jump;
             }
         }
+        LastFailure = $"Disconnected terrain: start={start} end={end}";
         return false;
     }
 }
