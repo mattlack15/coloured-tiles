@@ -43,6 +43,9 @@ namespace Jam
         [Tooltip("Player speed (m/s) at which the crowd starts giving ground.")]
         public float PlayerPushMinSpeed = 0.5f;
 
+        [Tooltip("The player's push force, kept in sync with CrowdPushReceiver.PushForce. Used to split an overlap between the two bodies by relative strength.")]
+        public float PlayerForce = 2.2f;
+
         [Header("Shoving")]
         [Tooltip("How hard this agent shoves. Compared with a neighbour's force, and only the weaker body moves, so a contact resolves once instead of both pushing apart.")]
         public float PushForce = 1f;
@@ -115,7 +118,12 @@ namespace Jam
             float dt = Time.deltaTime;
             _shovedThisFrame = false;
             ResolveShoves(dt);
-            if (_hasDestination) HandlePlayerContact(dt);
+
+            // Always, NOT only when the agent has a destination. Holding a tile is the state most of
+            // the crowd spends the round in, and gating this on having a destination meant those
+            // agents never separated from the player at all - which is why bodies visibly overlapped
+            // Bob. Only the path RESUME needs a destination; the separation does not.
+            HandlePlayerContact(dt);
             FightHeadOn(dt);
         }
 
@@ -196,13 +204,15 @@ namespace Jam
             bool playerAdvancing = playerSpeed > PlayerPushMinSpeed && closing > 0.35f;
 
             // Player and NPC layers do not collide, so nothing in PhysX resolves an overlap between
-            // them - an NPC that has ended up inside the player has to push ITSELF out. Doing it on
-            // this side is what makes the player immovable: you are never a participant in a
-            // collision, so there is no penetration recovery that can shove or lift you.
+            // them - the bodies have to be separated by hand. The separation is SPLIT by relative
+            // force rather than all given to the NPC: the weaker body yields more ground, but both
+            // move, so a bot does shove the player, just less than the player shoves it. Handing the
+            // whole overlap to the NPC would make the player feel weightless and untouchable.
             if (distance < contact)
             {
                 Vector3 escape = distance > 0.001f ? -toPlayer / distance : Vector3.forward;
-                Agent.Move(escape * (contact - distance));
+                float myShare = PlayerForce / Mathf.Max(0.01f, PlayerForce + PushForce);
+                Agent.Move(escape * (contact - distance) * myShare);
             }
 
             if (playerAdvancing)
@@ -234,6 +244,10 @@ namespace Jam
             if (!_halted) return;
 
             _halted = false;
+
+            // Holding on purpose: there is no path to restart, and resuming one would send the agent
+            // wandering off the tile it is defending.
+            if (!_hasDestination) return;
             if (!Agent.enabled || !Agent.isOnNavMesh) return;
             Agent.isStopped = false;
             Agent.SetDestination(_destination);

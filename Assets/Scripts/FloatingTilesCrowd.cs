@@ -119,6 +119,8 @@ namespace Jam
 
             uint rng = 0x51ED2u;
             var playerBody = _map.player != null ? _map.player.GetComponent<CharacterController>() : null;
+            var playerReceiver = _map.player != null ? _map.player.GetComponent<CrowdPushReceiver>() : null;
+            float playerForce = playerReceiver != null ? playerReceiver.PushForce : 1.6f;
 
             for (int i = 0; i < npcCount; i++)
             {
@@ -154,6 +156,7 @@ namespace Jam
                 loco.PressAgainstPlayer = true;
                 loco.PlayerPushSpeed = 2.2f;
                 loco.PlayerBody = playerBody;
+                loco.PlayerForce = playerForce;
                 loco.PushForce = traits.PushForce;
 
                 // The capsule collider is kept on purpose: the sidestep's neighbour query needs a

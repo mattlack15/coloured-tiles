@@ -21,7 +21,7 @@ using UnityEngine;
 public class FloatingMap : MonoBehaviour, IArena
 {
     [Header("Phase timing")]
-    [Min(0)] public float initialSeconds = 10;
+    [Min(0)] public float initialSeconds = 3;
     [Min(0)] public float moveSeconds = 15;
     [Min(0)] public float dropSeconds = 1;
     [Min(2)] public float resolveSeconds = 4;
@@ -48,6 +48,14 @@ public class FloatingMap : MonoBehaviour, IArena
     /// for the drop, the judgement and the reset, because there is no floor to path on and the map
     /// alone decides who survives.</summary>
     public bool MovementAllowed { get; private set; }
+
+    /// <summary>The RGB a colour index maps to. Exposed so a body can be painted the exact colour of
+    /// the tiles it is hunting - starting with the player, who otherwise never shows its colour.
+    /// It has to come from here rather than the shared Jam.Palette, because this arena's four RGB
+    /// values are its own and a colour cue that is merely similar is not good enough in a game
+    /// about matching colour.</summary>
+    public Color ColourForIndex(int index) =>
+        index >= 0 && index < colours.Length ? colours[index] : Color.white;
 
     public string Phase { get; private set; }
     public float Remaining { get; private set; }
@@ -227,7 +235,11 @@ public class FloatingMap : MonoBehaviour, IArena
         }
 
         Shuffle(active);
-        for (int i = 0; i < active.Count; i++) active[i].Colour = i % colours.Length;
+        for (int i = 0; i < active.Count; i++)
+        {
+            active[i].Colour = i % colours.Length;
+            active[i].ShowColour(colours[active[i].Colour]);
+        }
 
         RebuildColourIndex();
         CycleAdvanced?.Invoke(RoundNumber);

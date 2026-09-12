@@ -12726,7 +12726,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 02e80cf09134b4b2584e424ce36ced15, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FloatingMap
-  initialSeconds: 10
+  initialSeconds: 3
   moveSeconds: 15
   dropSeconds: 1
   resolveSeconds: 4
@@ -17635,7 +17635,7 @@ CharacterController:
   m_Enabled: 1
   serializedVersion: 3
   m_Height: 2
-  m_Radius: 0.5
+  m_Radius: 0.72329587
   m_SlopeLimit: 45
   m_StepOffset: 0.3
   m_SkinWidth: 0.08
@@ -17669,9 +17669,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5f5c8854f6e64b5d94bf477ec4d8b23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Jam.CrowdPushReceiver
-  PushForce: 1.6
-  ShoveSpeedPerForce: 2.5
-  MaxShoveSpeed: 3
+  PushForce: 2.2
+  MaxShovePerFrame: 0.05
   NpcMask:
     serializedVersion: 2
     m_Bits: 512

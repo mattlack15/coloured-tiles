@@ -283,6 +283,21 @@ namespace Jam
             var body = CreatePlayerVisual(root.transform);
             CreateHalo(root.transform);
 
+            // The crowd shoves the player through this, never through PhysX. Same setup as the
+            // hand-built arena so both scenes behave identically.
+            var pushReceiver = root.AddComponent<CrowdPushReceiver>();
+            pushReceiver.NpcMask = 1 << NpcLayer;
+
+            // Fit the collider to the drawn body. Bob is much wider for his height than a capsule
+            // is, and everything that separates from the player uses this radius, so a collider
+            // narrower than the model guarantees visible overlap.
+            if (playerMesh != null)
+            {
+                float vs = PlayerVisualHeight / Mathf.Max(0.0001f, playerMesh.bounds.size.y);
+                cc.radius = Mathf.Max(cc.radius, playerMesh.bounds.size.x * vs * 0.5f);
+                fallCollider.radius = cc.radius;
+            }
+
             Player = root.AddComponent<PlayerController>();
 
             var startCell = new Vector2Int(Board.Width / 2, Board.Height / 2);
@@ -314,6 +329,10 @@ namespace Jam
             _agentsRoot = new GameObject("Agents").transform;
 
             uint rng = (uint)seed * 2654435761u + 7u;
+
+            // One source of truth for the player's push strength: the receiver the crowd shoves.
+            var receiver = Player != null ? Player.GetComponent<CrowdPushReceiver>() : null;
+            float playerForce = receiver != null ? receiver.PushForce : 1.6f;
 
             for (int i = 0; i < npcCount; i++)
             {
@@ -351,6 +370,7 @@ namespace Jam
                 loco.PressAgainstPlayer = true;
                 loco.PlayerPushSpeed = playerPushSpeed;
                 loco.PlayerBody = _playerBody;
+                loco.PlayerForce = playerForce;
                 loco.PushForce = traits.PushForce;
 
                 var body = CreateBody(root.transform, NpcLayer, bodyRadius * 2f, bodyHeight * 0.5f, bodyRadius * 2f, true);

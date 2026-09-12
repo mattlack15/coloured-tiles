@@ -18,14 +18,11 @@ namespace Jam
     [RequireComponent(typeof(CharacterController))]
     public class CrowdPushReceiver : MonoBehaviour
     {
-        [Tooltip("How hard this body resists. NPCs run 0.85 to 1.30, so 1.6 means no single agent can move you, but several together can.")]
-        public float PushForce = 1.6f;
+        [Tooltip("How hard this body resists, relative to the crowd's 0.85 to 1.30. An overlap is split by this ratio, so 2.2 means a bot gives up roughly two thirds of the ground while you give one third - both move, you just move less.")]
+        public float PushForce = 2.2f;
 
-        [Tooltip("Metres per second of shove per unit of combined force advantage.")]
-        public float ShoveSpeedPerForce = 2f;
-
-        [Tooltip("Ceiling on shove speed, so a dense pack cannot fling the body.")]
-        public float MaxShoveSpeed = 3f;
+        [Tooltip("Ceiling on how far a shove can move the body in one frame. At 60fps 0.05 is about 3 m/s.")]
+        public float MaxShovePerFrame = 0.05f;
 
         public LayerMask NpcMask;
 
@@ -45,8 +42,7 @@ namespace Jam
             int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, reach,
                                                   _others, NpcMask, QueryTriggerInteraction.Ignore);
 
-            Vector3 direction = Vector3.zero;
-            float incoming = 0f;
+            Vector3 displacement = Vector3.zero;
 
             for (int i = 0; i < n; i++)
             {
@@ -60,22 +56,24 @@ namespace Jam
                 away.y = 0f;
                 float dist = away.magnitude;
                 if (dist < 0.001f) continue;
-                if (dist >= _cc.radius + npc.BodyRadius) continue;
 
-                direction += away / dist;
-                incoming += npc.PushForce;
+                float contact = _cc.radius + npc.BodyRadius;
+                if (dist >= contact) continue;
+
+                // Split the overlap by relative force. Both bodies give ground and the weaker one
+                // gives more, so a bot does push the player - just less than the player pushes it.
+                // Requiring the pack to out-total the player instead made one bot do nothing at all,
+                // which is immunity dressed up as weakness.
+                float share = npc.PushForce / Mathf.Max(0.01f, npc.PushForce + PushForce);
+                displacement += away / dist * ((contact - dist) * share);
             }
 
-            // Compare the PACK against this body, not each agent against it. Checking one at a time
-            // would mean a body stronger than any individual could never be moved at all, however
-            // many were leaning on it - which is the opposite of the intent.
-            if (incoming <= PushForce) return;
-            if (direction.sqrMagnitude < 0.0001f) return;
+            if (displacement.sqrMagnitude < 0.000001f) return;
 
-            float excess = incoming - PushForce;
-            Vector3 velocity = direction.normalized * Mathf.Min(excess * ShoveSpeedPerForce, MaxShoveSpeed);
-            velocity.y = 0f;                                      // horizontal only
-            _cc.Move(velocity * Time.deltaTime);
+            // Capped per frame so a dense pack jostles rather than flings.
+            displacement = Vector3.ClampMagnitude(displacement, MaxShovePerFrame);
+            displacement.y = 0f;                                  // horizontal only
+            _cc.Move(displacement);
         }
     }
 }

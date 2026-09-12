@@ -155,6 +155,12 @@ public static class MapBuilder
         Vector3 c = mesh.bounds.center;
         float s = cc.height / Mathf.Max(0.0001f, b.y);
 
+        // Bob is far wider for his height than a capsule is. Sizing the collider from height alone
+        // leaves his body and arms outside it, and since everything that separates from the player
+        // uses the collider radius, NPCs end up visibly overlapping him. Fit the collider to what is
+        // actually drawn.
+        cc.radius = Mathf.Max(cc.radius, b.x * s * 0.5f);
+
         visual.transform.localScale = new Vector3(s, s, s);
         // Solve localPosition.y + (c.y - b.y/2) * s = ccBottom so the lowest vertex meets the
         // controller's underside.

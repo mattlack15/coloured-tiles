@@ -57,6 +57,28 @@ namespace Jam
             _rigidbody = GetComponent<Rigidbody>();
         }
 
+        /// <summary>
+        /// Paint this body to match its assigned colour.
+        ///
+        /// Only the participant without a brain needs this. An NpcBrain already tints its own body
+        /// from shared per-colour materials, so painting here as well would swap every crowd agent
+        /// onto instanced materials for no gain.
+        ///
+        /// Uses .material, not .sharedMaterial: the renderer points at a shared asset, and recolouring
+        /// that would repaint every other body using it.
+        /// </summary>
+        public void ShowColour(Color colour)
+        {
+            if (GetComponent<NpcBrain>() != null) return;
+            if (_renderers == null) return;
+
+            foreach (var r in _renderers)
+            {
+                if (r == null) continue;
+                r.material.color = colour;
+            }
+        }
+
         /// <summary>Lowest point of the body, used to decide which tile is underfoot.</summary>
         public Vector3 Feet
         {
