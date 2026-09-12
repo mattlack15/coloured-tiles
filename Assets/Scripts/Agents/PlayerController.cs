@@ -84,17 +84,7 @@ namespace Jam
             if (_claimCooldown > 0f) _claimCooldown -= Time.deltaTime;
 
             Vector2 input = debugDrive;
-            if (input.sqrMagnitude < 0.0001f)
-            {
-                var kb = Keyboard.current;
-                if (kb != null)
-                {
-                    if (kb.wKey.isPressed) input.y += 1f;
-                    if (kb.sKey.isPressed) input.y -= 1f;
-                    if (kb.aKey.isPressed) input.x -= 1f;
-                    if (kb.dKey.isPressed) input.x += 1f;
-                }
-            }
+            if (input.sqrMagnitude < 0.0001f) input = InputBridge.Move;
             if (input.sqrMagnitude > 1f) input.Normalize();
 
             if (input.sqrMagnitude > 0.01f) _lastMoveDir = new Vector3(input.x, 0f, input.y).normalized;

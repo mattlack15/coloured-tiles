@@ -491,27 +491,144 @@ public class FloatingMap : MonoBehaviour, IArena
 
     void OnDestroy() { foreach (var m in owned) if (m) Destroy(m); }
 
+    // ---- HUD ----
+    // Split into separate corners rather than one big block: each piece of information gets its own
+    // place, so nothing has to be read as a paragraph and the things you check mid-round (timer,
+    // your colour, lives) sit at the edges of vision instead of in a wall of text.
+
+    GUIStyle _panelTitle, _panelBody, _timer, _banner;
+    static Texture2D _px;
+
+    static Texture2D Px
+    {
+        get
+        {
+            if (_px == null)
+            {
+                _px = new Texture2D(1, 1);
+                _px.SetPixel(0, 0, Color.white);
+                _px.Apply();
+            }
+            return _px;
+        }
+    }
+
+    void EnsureHudStyles()
+    {
+        if (_panelTitle != null) return;
+
+        // normal.textColor must be set explicitly: GUI.skin.label ships with a DARK default text
+        // colour (it is designed for light backgrounds), and GUI.color multiplies with it. Leaving
+        // it alone renders white-on-dark panels as near-black-on-black.
+        _panelTitle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 36,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = Color.white },
+        };
+        _panelBody = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 56,
+            fontStyle = FontStyle.Bold,
+            normal = { textColor = Color.white },
+        };
+        _timer = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 170,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = Color.white },
+        };
+        _banner = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = 100,
+            fontStyle = FontStyle.Bold,
+            alignment = TextAnchor.MiddleCenter,
+            normal = { textColor = Color.white },
+        };
+    }
+
+    /// <summary>Small titled panel: a dim caption over a brighter value.</summary>
+    void Panel(Rect r, string caption, string value, Color valueColour)
+    {
+        GUI.color = new Color(0f, 0f, 0f, 0.6f);
+        GUI.DrawTexture(r, Px);
+        GUI.color = new Color(0.75f, 0.82f, 0.9f, 1f);
+        GUI.Label(new Rect(r.x + 24f, r.y + 10f, r.width - 48f, 50f), caption, _panelTitle);
+        GUI.color = valueColour;
+        GUI.Label(new Rect(r.x + 24f, r.y + 62f, r.width - 48f, 78f), value, _panelBody);
+        GUI.color = Color.white;
+    }
+
     void OnGUI()
     {
+        EnsureHudStyles();
+
         var own = player != null ? player.GetComponent<TileParticipant>() : null;
-
-        GUI.Box(new Rect(18, 18, 520, 150), "FLOATING TILES — ROUND " + RoundNumber);
-        GUI.Label(new Rect(32, 43, 495, 25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
-
         int colour = own != null ? own.Colour : -1;
-        if (RoundNumber > 0 && colour >= 0)
+        bool revealed = RoundNumber > 0 && colour >= 0;
+
+        // 1. top left - where we are in the round
+        Panel(new Rect(28f, 24f, 900f, 150f), "ROUND " + RoundNumber, Phase, Color.white);
+
+        // 2. top centre - the countdown on its own, big enough to glance at
+        if (Remaining > 0f)
         {
-            Color old = GUI.color; GUI.color = colours[colour];
-            GUI.Label(new Rect(32, 68, 490, 25), "YOUR TILE: " + names[colour]); GUI.color = old;
+            var timerRect = new Rect(Screen.width * 0.5f - 220f, 14f, 440f, 200f);
+            GUI.color = new Color(0f, 0f, 0f, 0.5f);
+            GUI.DrawTexture(timerRect, Px);
+            GUI.color = Remaining < 4f ? new Color(1f, 0.55f, 0.4f) : Color.white;
+            GUI.Label(timerRect, Mathf.CeilToInt(Remaining).ToString(), _timer);
+            GUI.color = Color.white;
         }
 
-        if (own != null)
-            GUI.Label(new Rect(32, 93, 495, 25),
-                "Lives: " + own.Lives + (own.OutThisRound ? "   — fell this round, back on the edge next round" : "")
-                + (own.Eliminated ? "   — ELIMINATED" : ""));
+        // 3. top right - the state of the board
+        Panel(new Rect(Screen.width - 740f, 24f, 712f, 150f), "STILL STANDING",
+              AliveCount() + " / " + participants.Count + "     " + LitCount() + " lit", Color.white);
 
-        GUI.Label(new Rect(32, 116, 495, 25), "Still alive: " + AliveCount() + " / " + participants.Count + "   (lit tiles this round: " + LitCount() + ")");
-        GUI.Label(new Rect(32, 139, 495, 22), "WASD / arrows: move   Space: jump   R: restart");
+        // 4. bottom right - lives, with pips
+        var chip = new Rect(Screen.width - 740f, Screen.height - 178f, 712f, 150f);
+        Panel(chip, "LIVES", own != null ? own.Lives + (own.Eliminated ? "   ELIMINATED" : "") : "-", Color.white);
+        if (own != null)
+        {
+            for (int i = 0; i < startingLives; i++)
+            {
+                GUI.color = i < own.Lives ? new Color(0.45f, 0.9f, 0.5f) : new Color(1f, 1f, 1f, 0.18f);
+                GUI.DrawTexture(new Rect(chip.x + chip.width - 190f + i * 58f, chip.y + 74f, 44f, 44f), Px);
+            }
+            GUI.color = Color.white;
+        }
+
+        // 5. bottom left - your colour, as a chip you cannot misread
+        var colourPanel = new Rect(28f, Screen.height - 178f, 780f, 150f);
+        Panel(colourPanel, "YOUR COLOUR", revealed ? names[colour] : "waiting",
+              revealed ? colours[colour] : Color.white);
+        if (revealed)
+        {
+            GUI.color = colours[colour];
+            GUI.DrawTexture(new Rect(colourPanel.x + colourPanel.width - 190f, colourPanel.y + 64f, 156f, 58f), Px);
+            GUI.color = Color.white;
+        }
+
+        // 5. bottom centre - controls, small and out of the way
+        string hint = InputBridge.HasGamepad
+            ? "stick: move   ·   X / RT: punch   ·   Start: restart"
+            : "WASD: move   ·   E: punch   ·   R: restart";
+        GUI.color = new Color(1f, 1f, 1f, 0.6f);
+        GUI.Label(new Rect(0f, Screen.height - 56f, Screen.width, 52f), hint,
+                  new GUIStyle(_panelTitle) { fontSize = 34, alignment = TextAnchor.MiddleCenter });
+        GUI.color = Color.white;
+
+        // 6. centre - end of run, over everything else
+        if (GameOver)
+        {
+            var box = new Rect(0f, Screen.height * 0.5f - 46f, Screen.width, 92f);
+            GUI.color = new Color(0f, 0f, 0f, 0.7f);
+            GUI.DrawTexture(box, Px);
+            GUI.color = new Color(1f, 0.5f, 0.5f);
+            GUI.Label(box, "OUT OF LIVES", _banner);
+            GUI.color = Color.white;
+        }
     }
 
     int LitCount()

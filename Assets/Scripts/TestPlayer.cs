@@ -5,7 +5,6 @@ using UnityEngine.SceneManagement;
 public class TestPlayer : MonoBehaviour
 {
     public float speed = 6;
-    public float jumpHeight = 1.6f;
     public float launchSpeed = 18;
     public float launchUpSpeed = 9;
     CharacterController controller;
@@ -19,14 +18,14 @@ public class TestPlayer : MonoBehaviour
     void Awake() { controller = GetComponent<CharacterController>(); }
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.R)) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+        if (Jam.InputBridge.RestartPressed) SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         if (dead) return;
         if (!launched && controller.isGrounded && vertical < 0) vertical = -2;
-        if (!launched && controller.isGrounded && Input.GetKeyDown(KeyCode.Space)) vertical = Mathf.Sqrt(jumpHeight * 40);
+        // Jumping is deliberately gone. It let a player hop over the crowd and, worse, hop off a
+        // dropped tile and back on before the judgement, which dodged the whole round.
         vertical -= 20 * Time.deltaTime;
-        float x = (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) ? 1 : 0) - (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) ? 1 : 0);
-        float z = (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow) ? 1 : 0) - (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow) ? 1 : 0);
-        Vector3 move = launched ? launchVelocity : Vector3.ClampMagnitude(new Vector3(x,0,z),1) * speed;
+        Vector2 input = Jam.InputBridge.Move;
+        Vector3 move = launched ? launchVelocity : Vector3.ClampMagnitude(new Vector3(input.x,0,input.y),1) * speed;
         controller.Move((move + Vector3.up * vertical) * Time.deltaTime);
         if (transform.position.y < -9) Die();
     }

@@ -18,10 +18,6 @@ namespace Jam
     [DisallowMultipleComponent]
     public class PlayerPunch : MonoBehaviour
     {
-        [Header("Input")]
-        public Key PunchKey = Key.E;
-        public Key AlternatePunchKey = Key.J;
-
         [Header("Aim")]
         [Tooltip("How far ahead of the player the hitbox sits when it fires, mirroring how the original parked it along the aim line.")]
         public float Reach = 1.1f;
@@ -50,19 +46,14 @@ namespace Jam
 
         void Update()
         {
-            var kb = Keyboard.current;
-            if (kb == null || Hitbox == null) return;
+            if (Hitbox == null) return;
 
-            Vector2 input = Vector2.zero;
-            if (kb.wKey.isPressed) input.y += 1f;
-            if (kb.sKey.isPressed) input.y -= 1f;
-            if (kb.aKey.isPressed) input.x -= 1f;
-            if (kb.dKey.isPressed) input.x += 1f;
+            // Keyboard aims where you walk; a pad aims with the right stick. See InputBridge.
+            Vector2 aim = InputBridge.Aim;
+            if (aim.sqrMagnitude > 0.01f)
+                _aim = new Vector3(aim.x, 0f, aim.y).normalized;
 
-            if (input.sqrMagnitude > 0.01f)
-                _aim = new Vector3(input.x, 0f, input.y).normalized;
-
-            if (kb[PunchKey].wasPressedThisFrame || kb[AlternatePunchKey].wasPressedThisFrame)
+            if (InputBridge.PunchPressed)
                 Fire();
 
             if (_armedUntil > 0f && Time.time >= _armedUntil)
