@@ -17878,7 +17878,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5f5c8854f6e64b5d94bf477ec4d8b23, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Jam.CrowdPushReceiver
-  PushForce: 2.2
+  PushForce: 0.45
   MaxShovePerFrame: 0.05
   NpcMask:
     serializedVersion: 2

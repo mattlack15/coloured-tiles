@@ -38,7 +38,12 @@ namespace Jam
         {
             if (NpcMask == 0 || _cc == null) return;
 
-            float reach = _cc.radius + 0.35f;
+            // The sphere MUST be larger than the contact distance it is about to test, or it can
+            // never see a touching agent. It was _cc.radius + 0.35 while contact is
+            // _cc.radius + BodyRadius (0.38 for the crowd), so the detection sphere was smaller than
+            // the distance being compared against - it only ever caught bodies already overlapping,
+            // which is a sliver nobody sits in, since NPCs deliberately settle at contact.
+            float reach = _cc.radius + 1f;
             int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, reach,
                                                   _others, NpcMask, QueryTriggerInteraction.Ignore);
 
