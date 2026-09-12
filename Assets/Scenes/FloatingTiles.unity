@@ -17592,6 +17592,7 @@ GameObject:
   - component: {fileID: 1472130542}
   - component: {fileID: 1472130541}
   - component: {fileID: 1472130540}
+  - component: {fileID: 1472130543}
   m_Layer: 8
   m_Name: Test Player
   m_TagString: Untagged
@@ -17656,6 +17657,24 @@ Transform:
   - {fileID: 302805208}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1472130543
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1472130539}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c5f5c8854f6e64b5d94bf477ec4d8b23, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Jam.CrowdPushReceiver
+  PushForce: 1.6
+  ShoveSpeedPerForce: 2.5
+  MaxShoveSpeed: 3
+  NpcMask:
+    serializedVersion: 2
+    m_Bits: 512
 --- !u!1 &1472217663
 GameObject:
   m_ObjectHideFlags: 0

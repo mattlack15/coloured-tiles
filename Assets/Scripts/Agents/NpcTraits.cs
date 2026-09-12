@@ -50,6 +50,11 @@ namespace Jam
 
         public float SpeedFactor = 1f;
 
+        /// <summary>How hard this agent shoves in a crowd. Compared against a neighbour's force, and
+        /// only the weaker body is displaced, so a contact is settled by one side rather than both
+        /// parties pushing each other apart and double-counting the separation.</summary>
+        public float PushForce = 1f;
+
         public static NpcTraits Make(NpcArchetype archetype, float speedFactor, ref uint rng)
         {
             var t = new NpcTraits { Archetype = archetype, SpeedFactor = speedFactor };
@@ -67,6 +72,7 @@ namespace Jam
                     t.DistanceWeight = 1.1f;
                     t.PrefersFar = true;
                     t.Patience = 2.4f;
+                    t.PushForce = 1.30f;      // the shover: it will go through you to reach a tile
                     break;
 
                 case NpcArchetype.Cautious:
@@ -76,6 +82,7 @@ namespace Jam
                     t.DistanceWeight = 1f;
                     t.PrefersFar = true;
                     t.Patience = 3.5f;
+                    t.PushForce = 0.85f;      // the one that gets shoved off its tile
                     break;
 
                 case NpcArchetype.Drifter:
@@ -84,6 +91,7 @@ namespace Jam
                     t.DistanceWeight = 0.7f;
                     t.PreferredDistance = 4f + Palette.Hash01(ref rng) * 4f;
                     t.Patience = 4.5f;
+                    t.PushForce = 1f;
                     reactionScale = 1.6f;
                     break;
 
@@ -94,6 +102,7 @@ namespace Jam
                     t.PrefersFar = false;
                     t.CongestionWeight = 1.25f;
                     t.Patience = 3f;
+                    t.PushForce = 1.10f;      // holds its ground
                     reactionScale = 0.55f;
                     break;
             }

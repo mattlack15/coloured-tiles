@@ -351,6 +351,7 @@ namespace Jam
                 loco.PressAgainstPlayer = true;
                 loco.PlayerPushSpeed = playerPushSpeed;
                 loco.PlayerBody = _playerBody;
+                loco.PushForce = traits.PushForce;
 
                 var body = CreateBody(root.transform, NpcLayer, bodyRadius * 2f, bodyHeight * 0.5f, bodyRadius * 2f, true);
                 var line = CreateTargetLine(root.transform);

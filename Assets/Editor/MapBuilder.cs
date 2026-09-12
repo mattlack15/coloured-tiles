@@ -127,6 +127,11 @@ public static class MapBuilder
         var cc = player.AddComponent<CharacterController>();
         player.AddComponent<TestPlayer>();
 
+        // Lets the crowd shove the player without ever going through PhysX, which would resolve the
+        // contact by moving the CharacterController - sometimes upward, which floats the player.
+        var push = player.AddComponent<CrowdPushReceiver>();
+        push.NpcMask = 1 << GameBootstrap.NpcLayer;
+
         var visual = new GameObject("Visual");
         visual.layer = GameBootstrap.PlayerLayer;
         visual.transform.SetParent(player.transform, false);

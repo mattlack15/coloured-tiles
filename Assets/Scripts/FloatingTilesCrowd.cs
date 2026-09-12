@@ -154,6 +154,7 @@ namespace Jam
                 loco.PressAgainstPlayer = true;
                 loco.PlayerPushSpeed = 2.2f;
                 loco.PlayerBody = playerBody;
+                loco.PushForce = traits.PushForce;
 
                 // The capsule collider is kept on purpose: the sidestep's neighbour query needs a
                 // collider to find, even though nothing resolves collisions between agents.

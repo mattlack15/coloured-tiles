@@ -43,6 +43,12 @@ namespace Jam
         [Tooltip("Player speed (m/s) at which the crowd starts giving ground.")]
         public float PlayerPushMinSpeed = 0.5f;
 
+        [Header("Shoving")]
+        [Tooltip("How hard this agent shoves. Compared with a neighbour's force, and only the weaker body moves, so a contact resolves once instead of both pushing apart.")]
+        public float PushForce = 1f;
+        [Tooltip("Extra metres per second of shove per unit of force advantage. This is what lets a shove carry someone off their tile rather than merely un-overlapping them.")]
+        public float ShoveSpeedPerForce = 2.5f;
+
         /// <summary>The player's body, read for velocity so NPCs know which way you are bearing down.</summary>
         public CharacterController PlayerBody;
 
@@ -58,6 +64,7 @@ namespace Jam
         Vector3 _destination;
         bool _hasDestination;
         bool _halted;
+        bool _shovedThisFrame;
         float _sidestepTimer;
 
         readonly Collider[] _others = new Collider[24];
@@ -106,8 +113,49 @@ namespace Jam
             if (!Agent.enabled || !Agent.isOnNavMesh) return;
 
             float dt = Time.deltaTime;
+            _shovedThisFrame = false;
+            ResolveShoves(dt);
             if (_hasDestination) HandlePlayerContact(dt);
             FightHeadOn(dt);
+        }
+
+        /// <summary>
+        /// NPC-vs-NPC shoving. Only the WEAKER body is displaced, by the force difference, so a
+        /// contact is settled by one side rather than both pushing each other apart and
+        /// double-counting the separation.
+        ///
+        /// The displacement covers the overlap AND keeps going while the stronger body leans in.
+        /// Just un-overlapping would make shoving a no-op: bodies would be separated but never moved
+        /// off the tile they are standing on, which is the whole point of pushing.
+        /// </summary>
+        void ResolveShoves(float dt)
+        {
+            float reach = BodyRadius * 2.2f + 0.4f;
+            int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, reach,
+                                                  _others, NpcMask, QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < n; i++)
+            {
+                var rb = _others[i].attachedRigidbody;
+                if (rb == null || rb.transform == transform) continue;
+
+                var other = rb.GetComponent<NpcLocomotion>();
+                if (other == null) continue;
+
+                float excess = other.PushForce - PushForce;
+                if (excess <= 0f) continue;      // I am not the weaker one: nothing happens to me
+
+                Vector3 away = transform.position - rb.transform.position;
+                away.y = 0f;
+                float dist = away.magnitude;
+                float contact = BodyRadius + other.BodyRadius;
+                if (dist >= contact) continue;
+
+                Vector3 dir = dist > 0.001f ? away / dist : transform.forward;
+
+                Agent.Move(dir * ((contact - dist) + excess * ShoveSpeedPerForce * dt));
+                _shovedThisFrame = true;
+            }
         }
 
         bool PlayerWithin(float range, out float distance, out Vector3 toPlayer)
@@ -197,7 +245,10 @@ namespace Jam
         /// </summary>
         void FightHeadOn(float dt)
         {
-            if (!SidestepEnabled)
+            // A shove already resolved this contact; adding lateral avoidance on top would fight it
+            // and produce jitter. The sidestep exists for the case shoving cannot settle - equal
+            // forces, where neither body is the weaker one and both would otherwise stand still.
+            if (!SidestepEnabled || _shovedThisFrame)
             {
                 _sidestepTimer = 0f;
                 return;
