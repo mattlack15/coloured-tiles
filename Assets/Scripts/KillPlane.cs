@@ -3,7 +3,7 @@ public class KillPlane : MonoBehaviour
 {
     void OnTriggerEnter(Collider other)
     {
-        var player = other.GetComponentInParent<TestPlayer>();
-        if (player) player.Die();
+        var actor = other.GetComponentInParent<TileActor>();
+        if (actor) actor.Die();
     }
 }
