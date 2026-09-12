@@ -16,6 +16,7 @@ public class TileBot : MonoBehaviour
     int waypoint;
     float reactionUntil, replanAt, blockedFor, recoveryUntil, pushUntil, lastRouteDistance;
     float jumpUntil;
+    float progressSinceCheck;
     Vector3 jumpLanding;
     int passingSide;
     bool recovering;
@@ -35,6 +36,7 @@ public class TileBot : MonoBehaviour
         waypoint = 0;
         reactionUntil = float.PositiveInfinity;
         replanAt = blockedFor = recoveryUntil = pushUntil = jumpUntil = 0;
+        progressSinceCheck = 0;
         recovering = false;
         State = "Waiting";
         actor.SetInput(Vector3.zero);
@@ -126,7 +128,15 @@ public class TileBot : MonoBehaviour
         }
         Vector3 desired = Flat(route[waypoint].position - position).normalized;
         float routeDistance = RouteDistance();
-        if (routeDistance < lastRouteDistance - .025f) { blockedFor = 0; recovering = false; }
+        // Accumulate distance across frames: a minimum per-frame movement falsely
+        // reports a stall at high frame rates, even at full movement speed.
+        progressSinceCheck += lastRouteDistance - routeDistance;
+        if (progressSinceCheck >= .05f)
+        {
+            blockedFor = 0;
+            recovering = false;
+            progressSinceCheck = 0;
+        }
         else blockedFor += dt;
         lastRouteDistance = routeDistance;
         float patienceSeconds = Mathf.Lerp(.35f, 1.1f, personality.patience);

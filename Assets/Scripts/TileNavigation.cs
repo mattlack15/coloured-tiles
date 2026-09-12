@@ -51,7 +51,11 @@ public sealed class TileNavigation
         p.y = floorY;
         bool support = HasFloor(p) ||
             (HasFloor(p + Vector3.right * .18f) && HasFloor(p - Vector3.right * .18f)) ||
-            (HasFloor(p + Vector3.forward * .18f) && HasFloor(p - Vector3.forward * .18f));
+            (HasFloor(p + Vector3.forward * .18f) && HasFloor(p - Vector3.forward * .18f)) ||
+            // Four tiles meet around a tiny cross-shaped gap. Opposite diagonal
+            // contacts support the capsule even when all cardinal probes miss.
+            (HasFloor(p + new Vector3(.18f, 0, .18f)) && HasFloor(p - new Vector3(.18f, 0, .18f))) ||
+            (HasFloor(p + new Vector3(.18f, 0, -.18f)) && HasFloor(p - new Vector3(.18f, 0, -.18f)));
         return support && ClearBody(p);
     }
     bool ClearBody(Vector3 feet)
