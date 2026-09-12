@@ -53,10 +53,16 @@ public class TileActor : MonoBehaviour
             var collider = visual.GetComponent<Collider>();
             collider.enabled = false;
             Destroy(collider);
-            bodyMaterial = new Material(Shader.Find("Unlit/Color"));
-            bodyMaterial.color = Color.white;
-            visual.GetComponent<Renderer>().sharedMaterial = bodyMaterial;
             bodyRenderers = GetComponentsInChildren<Renderer>();
+        }
+        // Per-character shading keeps overlapping silhouettes readable without scene lights.
+        bodyMaterial = new Material(Resources.Load<Shader>("CharacterColour"));
+        bodyMaterial.color = Color.white;
+        foreach (var renderer in bodyRenderers)
+        {
+            var materials = renderer.sharedMaterials;
+            for (int i = 0; i < materials.Length; i++) materials[i] = bodyMaterial;
+            renderer.sharedMaterials = materials;
         }
         colourBlock = new MaterialPropertyBlock();
     }
