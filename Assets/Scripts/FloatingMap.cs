@@ -36,6 +36,7 @@ public class FloatingMap : MonoBehaviour
     public bool GameOver { get; private set; }
     public int TargetColour => Human ? Human.ColourIndex : -1;
     public int RoundNumber { get; private set; }
+	public float currentMoveSeconds { get; private set; }
     public TileNavigation Navigation { get; private set; }
     public IReadOnlyList<TileActor> Actors => actors;
     public IReadOnlyList<TileBot> Bots => bots;
@@ -51,6 +52,7 @@ public class FloatingMap : MonoBehaviour
     Transform[] outlines;
     System.Random random;
     bool showDebug;
+    float currentMoveSeconds;
 
     void Awake()
     {
@@ -132,6 +134,7 @@ public class FloatingMap : MonoBehaviour
     public void BeginRound()
     {
         RoundNumber++;
+		currentMoveSeconds = Mathf.Max(3f, moveSeconds - (RoundNumber - 1));
         Revealed = Resolving = false;
         Phase = "All tiles black — get ready";
         for (int i = 0; i < tiles.Length; i++)
@@ -271,7 +274,7 @@ public class FloatingMap : MonoBehaviour
         while (!GameOver)
         {
             RevealRound();
-            yield return Countdown(moveSeconds);
+            yield return Countdown(currentMoveSeconds);
             DropBlackTiles();
             yield return Countdown(dropSeconds);
             JudgeColours();
