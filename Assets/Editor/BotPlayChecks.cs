@@ -89,7 +89,7 @@ public static class BotPlayChecks
     }
     static IEnumerator Checks(FloatingMap map)
     {
-        Check(map.Bots.Count == 7 && map.Actors.Count == 8, "Scene starts one human and seven bots");
+        Check(map.Bots.Count == map.botCount && map.Actors.Count == map.botCount + 1, "Scene starts one human and the configured bots");
         Check(map.Navigation.NodeCount > 100, "Navigation builds from scene terrain");
         var bot = map.Bots[0];
         var runner = bot.GetComponent<TileActor>();
@@ -126,7 +126,7 @@ public static class BotPlayChecks
         Vector3 reactionDelta = runner.transform.position - beforeReaction; reactionDelta.y = 0;
         Check(reactionDelta.magnitude < .04f, "Reaction delay actually delays movement");
         bot.personality.reactionDelay = reaction;
-        var counts = new int[4];
+        var counts = new int[Mathf.Clamp(map.litTileCount, 3, 4)];
         bool slots = true;
         foreach (var a in map.Actors)
         {
@@ -134,7 +134,9 @@ public static class BotPlayChecks
             foreach (var b in map.Actors) if (a != b && a.ColourIndex == b.ColourIndex)
                 slots &= a.Target == b.Target && Vector3.Distance(a.TargetPosition, b.TargetPosition) >= TileActor.Radius * 2;
         }
-        Check(Array.TrueForAll(counts, count => count == 2) && slots, "Balanced colours share tiles with distinct, usable standing spots");
+        Check(Array.TrueForAll(counts, count => count >= map.Actors.Count / counts.Length
+            && count <= Mathf.CeilToInt((float)map.Actors.Count / counts.Length)) && slots,
+            "Balanced colours share tiles with distinct, usable standing spots");
         Check(map.Bots[1].personality.assertiveness > bot.personality.assertiveness
             && map.Bots[2].personality.commitment < map.Bots[1].personality.commitment,
             "Planner, bulldozer and opportunist have distinct stable traits");
@@ -231,7 +233,7 @@ public static class BotPlayChecks
                 File.AppendAllText(ReportPath, $"ROUND {round + 1}: {actor.name} {item.State} target={actor.ColourIndex} onTarget={actor.IsOnTarget()} position={actor.transform.position}\n");
             }
             reached += safe;
-            Check(safe >= 5, $"Crowded round {round + 1}: {safe}/7 bots reach their own tile");
+            Check(safe >= Mathf.CeilToInt(map.Bots.Count * .7f), $"Crowded round {round + 1}: {safe}/{map.Bots.Count} bots reach their own tile");
         }
         int avoidanceAfter = 0;
         foreach (var item in map.Bots) avoidanceAfter += item.AvoidanceDecisions;

@@ -10,7 +10,7 @@ public class FloatingMap : MonoBehaviour
     [Min(2)] public float resolveSeconds = 4;
     [Min(.01f)] public float fadeSeconds = 1;
     [Range(3, 4)] public int litTileCount = 4;
-    [Range(0, 11)] public int botCount = 7;
+    [Range(0, 11)] public int botCount = 11;
     [Tooltip("Zero gives a different match each time; another value reproduces a match.")]
     public int randomSeed;
     public Transform spawnPoint;
