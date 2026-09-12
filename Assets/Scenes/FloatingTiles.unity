@@ -12826,7 +12826,7 @@ MonoBehaviour:
   drawTargetLines: 0
   slipEdgeMargin: 1.05
   slipRadius: 1
-  slipCrowd: 2
+  slipCrowd: 0
   slipOutwardDot: 0.2
   slipTime: 0.4
   slipImpulse: 2.4

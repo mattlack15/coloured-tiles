@@ -92,11 +92,11 @@ public class TitleScreen : MonoBehaviour
         {
             GUI.Label(new Rect(80,162,800,48),"How to play",heading);
             GUI.Label(new Rect(140,223,680,260),
-                "<b>Move:</b> WASD or arrow keys     <b>Jump:</b> Space\n\n" +
-                "Match a tile to <b>your character’s colour</b> before the timer ends. Your white outline identifies you.\n\n" +
-                "Black tiles and the edge platform disappear. Standing on a wrong colour launches you off!\n\n" +
-                "You have <b>3 lives</b>. After a fall, respawn on the edge next round. Survivors stay on their tile.",body);
-            GUI.Label(new Rect(140,490,680,50),"Lose all three lives and the game ends. Press R during play to return to this title screen.",body);
+                "<b>Move:</b> WASD or arrow keys     <b>Punch:</b> E\n\n" +
+                "Tiles light up and you are given a colour. Reach a lit tile of that colour before the timer runs out. Your white outline identifies you.\n\n" +
+                "When the timer ends the dark tiles drop away, so anything not standing on a lit tile of its own colour falls. Getting there is a shoving match - the crowd does not move for you.\n\n" +
+                "You have <b>3 lives</b>. A fall costs you the rest of the round, and you are back on the edge when the next one starts.",body);
+            GUI.Label(new Rect(140,490,680,50),"Lose all three lives and the run ends. Press R during play to return to this title screen.",body);
             if (GUI.Button(new Rect(330,560,300,56),"Back",button)) help = false;
         }
         GUI.matrix = oldMatrix; GUI.color = oldColour; GUI.depth = oldDepth;

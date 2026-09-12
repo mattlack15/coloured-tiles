@@ -38,7 +38,7 @@ namespace Jam
         [Header("Being squeezed off the edge")]
         public float slipEdgeMargin = 1.05f;
         public float slipRadius = 1f;
-        public int slipCrowd = 2;
+        public int slipCrowd = 0;
         public float slipOutwardDot = 0.2f;
         public float slipTime = 0.4f;
         public float slipImpulse = 2.4f;
