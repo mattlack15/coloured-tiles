@@ -4,7 +4,17 @@ using UnityEngine;
 
 public class FloatingMap : MonoBehaviour
 {
-    public string gameTitle = "GAME NAME";
+    public const string GameTitle = "Colour Me Surprised!";
+    public bool IsGameOver => HasStarted && player && player.IsEliminated;
+    static bool restartIntoGame;
+    bool colourHazard;
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetSession() { restartIntoGame = false; }
+    public void RestartGame(bool skipTitle)
+    {
+        restartIntoGame = skipTitle;
+        UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+    }
     public bool HasStarted { get; private set; }
     [Min(0)] public float initialSeconds = 10;
     [Min(0)] public float moveSeconds = 15;
@@ -87,6 +97,7 @@ public class FloatingMap : MonoBehaviour
         BuildSpawns();
         foreach (var tile in tiles) tile.material.color = new Color(.015f,.018f,.025f);
         if (player && spawns.Count > 0) player.Respawn(spawns[0]);
+        if (restartIntoGame) { restartIntoGame = false; BeginGame(); }
     }
     public void BeginGame()
     {
@@ -181,6 +192,7 @@ public class FloatingMap : MonoBehaviour
     {
         if (Resolving) return;
         Resolving = true;
+        colourHazard = true;
         Remaining = 0;
         Phase = "Black tiles dropped";
         foreach (var platform in platforms) platform.gameObject.SetActive(false);
@@ -217,6 +229,7 @@ public class FloatingMap : MonoBehaviour
     {
         foreach (var actor in actors)
         {
+            if (actor.IsDead || actor.IsLaunched) continue;
             int tile = TileUnderActor(actor);
             if (tile >= 0 && tileColours[tile] != actor.ColourIndex) actor.LaunchOff(transform.position);
         }
@@ -263,6 +276,15 @@ public class FloatingMap : MonoBehaviour
             yield return Countdown(dropSeconds);
             JudgeColours();
             yield return Countdown(resolveSeconds);
+            // Let late launches finish; bound this wait in case wall geometry traps an actor.
+            float launchWait = 0;
+            while (actors.Exists(a => a.IsLaunched && !a.IsDead) && launchWait < 6)
+            {
+                launchWait += Time.deltaTime;
+                yield return null;
+            }
+            foreach (var actor in actors) if (actor.IsLaunched && !actor.IsDead) actor.Die("Wrong colour!");
+            colourHazard = false;
             FinishRound();
             if (GameOver) yield break;
             SetBlackTiles(true);
@@ -284,12 +306,20 @@ public class FloatingMap : MonoBehaviour
     }
     void Update()
     {
+        if (IsGameOver && !GameOver)
+        {
+            GameOver = true;
+            colourHazard = false;
+            StopAllCoroutines();
+            Phase = "Game over";
+            Remaining = 0;
+        }
         if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug;
         if (Input.GetKeyDown(KeyCode.N)) Remaining = 0;
     }
     void LateUpdate()
     {
-        if (Navigation == null) return;
+        if (Navigation == null || GameOver || IsGameOver) return;
         float dt = Time.deltaTime;
         if (dt <= 0) return;
         if (player) foreach (var actor in actors)
@@ -298,10 +328,11 @@ public class FloatingMap : MonoBehaviour
         foreach (var actor in actors) actor.Step(dt);
         for (int i = 0; i < actors.Count; i++) for (int j = i + 1; j < actors.Count; j++)
             TileActor.ResolveContact(actors[i], actors[j], dt);
+        if (colourHazard) JudgeColours();
     }
     void OnGUI()
     {
-        if (!HasStarted) return;
+        if (!HasStarted || IsGameOver) return;
         GUI.Box(new Rect(18,18,470,125), "FLOATING TILES — ROUND " + RoundNumber);
         GUI.Label(new Rect(32,43,445,25), Phase + (Remaining > 0 ? "  " + Mathf.CeilToInt(Remaining) + "s" : ""));
         GUI.Label(new Rect(32,93,445,25), "WASD: move  Click/Enter: punch  R: restart  N: skip");

@@ -13,6 +13,7 @@ public class Player : MonoBehaviour
     public float launchSpeed = 10;
     public float launchUpSpeed = 24;
     public TileActor Actor { get; private set; }
+    public bool IsLaunched => Actor && Actor.IsLaunched;
     public bool IsDead => Actor && Actor.IsDead;
     public bool IsEliminated => Actor && Actor.IsEliminated;
     public int LivesRemaining => Actor ? Actor.LivesRemaining : 3;
@@ -46,5 +47,5 @@ public class Player : MonoBehaviour
     public void Respawn(Vector3 position) { if (Actor) Actor.ResetRound(position); }
     public void LaunchOff(Vector3 centre) { if (Actor) Actor.LaunchOff(centre); }
     public void SetTargetColour(Color colour) { if (Actor) Actor.SetTint(colour); }
-    protected virtual void OnGUI() { if (IsDead) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), IsEliminated ? "Game over!\nPress R to restart with 3 lives." : "Life lost!\nRespawning on the edge next round."); }
+    protected virtual void OnGUI() { if (IsDead && !IsEliminated) GUI.Box(new Rect(Screen.width / 2 - 180,Screen.height / 2 - 35,360,70), "Life lost!\nRespawning on the edge next round."); }
 }
