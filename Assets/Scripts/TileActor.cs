@@ -188,8 +188,10 @@ public class TileActor : MonoBehaviour
     public static void ResolveContact(TileActor a, TileActor b, float dt)
     {
         if (!a.isActiveAndEnabled || !b.isActiveAndEnabled || a.IsDead || b.IsDead || a.IsLaunched || b.IsLaunched) return;
-        if (Mathf.Abs(a.transform.position.y - b.transform.position.y) > Height * .85f) return;
-        Vector3 delta = b.transform.position - a.transform.position;
+        Bounds aBounds = a.controller.bounds;
+        Bounds bBounds = b.controller.bounds;
+        if (aBounds.max.y <= bBounds.min.y || bBounds.max.y <= aBounds.min.y) return;
+        Vector3 delta = bBounds.center - aBounds.center;
         delta.y = 0;
         float distance = delta.magnitude;
         if (distance > a.BodyRadius + b.BodyRadius + .1f || distance < .001f) return;
