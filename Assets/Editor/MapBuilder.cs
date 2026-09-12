@@ -14,10 +14,19 @@ public static class MapBuilder
     const string TileModelPath = "Assets/Models/Tile_t2.obj";
     const string PlayerModelPath = "Assets/Models/Bob.obj";
 
-    /// <summary>Tile footprint in world units. Must match the 2.2 grid spacing so adjacent tiles
-    /// share an edge: at anything less they share no floor, and a NavMeshAgent can never path
-    /// between them because there is nothing in the gap to walk on.</summary>
-    const float TileWorldSize = 2.2f;
+    /// <summary>Grid size in tiles, per side.</summary>
+    const int GridSize = 7;
+
+    /// <summary>Centre-to-centre tile spacing. Must EQUAL <see cref="TileWorldSize"/> so adjacent
+    /// tiles share an edge: at anything larger they share no floor, and a NavMeshAgent can never
+    /// path between them because there is nothing in the gap to walk on.</summary>
+    const float GridSpacing = 2f;
+
+    /// <summary>Tile footprint in world units.</summary>
+    const float TileWorldSize = 2f;
+
+    /// <summary>Width of the safe edge platforms that ring the grid.</summary>
+    const float RingWidth = 2f;
 
     /// <summary>Tile top surface. Must match the platform tops (scale 0.35 centred on y=0) so the
     /// grid and the ring stay flush.</summary>
@@ -167,10 +176,21 @@ public static class MapBuilder
         var playerMesh = LoadMesh(PlayerModelPath);
         var root = new GameObject("Floating Map"); var map = root.AddComponent<FloatingMap>();
         var tiles = new List<Renderer>(); var platforms = new List<Renderer>();
-        for (int z = 0; z < 5; z++) for (int x = 0; x < 5; x++)
+
+        // Everything about the ring is derived from the grid, so changing GridSize cannot leave the
+        // platforms overlapping the tiles or floating away from them.
+        float halfGrid = GridSize * GridSpacing * 0.5f;          // grid edge
+        float ringCentre = halfGrid + RingWidth * 0.5f;          // middle of the 2-wide ledge
+        float ringSpan = halfGrid * 2f + RingWidth * 2f;         // full outer span
+        float ringSideSpan = halfGrid * 2f;                      // west/east only bridge the middle
+        var ringScaleLong = new Vector3(ringSpan, .35f, RingWidth);
+        var ringScaleSide = new Vector3(RingWidth, .35f, ringSideSpan);
+
+        float half = (GridSize - 1) * 0.5f;
+        for (int z = 0; z < GridSize; z++) for (int x = 0; x < GridSize; x++)
         {
-            var center = new Vector3((x-2)*2.2f,0,(z-2)*2.2f);
-            var tile = Tile("Tile " + (z*5+x+1).ToString("00"),center,black,tileMesh,root.transform);
+            var center = new Vector3((x-half)*GridSpacing, 0, (z-half)*GridSpacing);
+            var tile = Tile("Tile " + (z*GridSize+x+1).ToString("00"),center,black,tileMesh,root.transform);
             tiles.Add(tile.GetComponent<Renderer>());
             for (int edge=0;edge<4;edge++)
             {
@@ -184,11 +204,11 @@ public static class MapBuilder
                 Object.DestroyImmediate(line.GetComponent<Collider>());
             }
         }
-        platforms.Add(Box("Start platform — south",new Vector3(0,0,-6.4f),new Vector3(14.8f,.35f,2),ring,root.transform).GetComponent<Renderer>());
-        platforms.Add(Box("Platform — north",new Vector3(0,0,6.4f),new Vector3(14.8f,.35f,2),ring,root.transform).GetComponent<Renderer>());
-        platforms.Add(Box("Platform — west",new Vector3(-6.4f,0,0),new Vector3(2,.35f,10.8f),ring,root.transform).GetComponent<Renderer>());
-        platforms.Add(Box("Platform — east",new Vector3(6.4f,0,0),new Vector3(2,.35f,10.8f),ring,root.transform).GetComponent<Renderer>());
-        var spawn = new GameObject("Spawn Point"); spawn.transform.position = new Vector3(0,1.3f,-6.4f); spawn.transform.SetParent(root.transform);
+        platforms.Add(Box("Start platform — south",new Vector3(0,0,-ringCentre),ringScaleLong,ring,root.transform).GetComponent<Renderer>());
+        platforms.Add(Box("Platform — north",new Vector3(0,0,ringCentre),ringScaleLong,ring,root.transform).GetComponent<Renderer>());
+        platforms.Add(Box("Platform — west",new Vector3(-ringCentre,0,0),ringScaleSide,ring,root.transform).GetComponent<Renderer>());
+        platforms.Add(Box("Platform — east",new Vector3(ringCentre,0,0),ringScaleSide,ring,root.transform).GetComponent<Renderer>());
+        var spawn = new GameObject("Spawn Point"); spawn.transform.position = new Vector3(0,1.3f,-ringCentre); spawn.transform.SetParent(root.transform);
         map.spawnPoint = spawn.transform; map.tiles = tiles.ToArray(); map.platforms = platforms.ToArray();
         var kill = Box("Kill Plane",new Vector3(0,-7,0),new Vector3(100,1,100),danger);
         kill.GetComponent<BoxCollider>().isTrigger = true; kill.AddComponent<KillPlane>();
