@@ -21,7 +21,7 @@ namespace Jam
     ///    never walk off - they have to be squeezed off by their neighbours. See NpcBrain's
     ///    edge-slip check and the slip* knobs below.
     /// </summary>
-    public class GameBootstrap : MonoBehaviour
+    public class GameBootstrap : MonoBehaviour, ICrowdContext
     {
         public static GameBootstrap I { get; private set; }
 
@@ -102,6 +102,20 @@ namespace Jam
 
         [Header("Debug")]
         public bool drawTargetLines = false;
+
+        // ---- ICrowdContext ----
+        // Pass-throughs to the serialized tuning fields below, so the crowd can be driven by this
+        // component without depending on its concrete type.
+        public int NpcRespawnMargin => npcRespawnMargin;
+        public float ClaimCooldown => claimCooldown;
+        public bool DrawTargetLines => drawTargetLines;
+        public float SlipEdgeMargin => slipEdgeMargin;
+        public float SlipRadius => slipRadius;
+        public int SlipCrowd => slipCrowd;
+        public float SlipOutwardDot => slipOutwardDot;
+        public float SlipTime => slipTime;
+        public float SlipImpulse => slipImpulse;
+        public float SlipHop => slipHop;
 
         public bool RoundActive { get; private set; }
         public float TimeLeft { get; private set; }

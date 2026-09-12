@@ -24,7 +24,9 @@ namespace Jam
         /// <summary>Crowd-owned congestion bookkeeping; deliberately not part of the arena.</summary>
         public CrowdRegistry Registry;
         public NpcLocomotion Loco;
-        public GameBootstrap Game;
+        /// <summary>Whoever is running the round. Deliberately an interface, so this brain can be
+        /// driven by the procedural board or by the hand-built arena's round loop.</summary>
+        public ICrowdContext Game;
         public NpcTraits Traits;
         public ColorId AssignedColor;
         public int Id;
@@ -53,7 +55,7 @@ namespace Jam
         Vector2Int _occupancyCell = new Vector2Int(-1, -1);
         Vector2Int _lastClaimCell = new Vector2Int(-999, -999);
 
-        public void Init(IArena board, CrowdRegistry registry, GameBootstrap game, int id, ColorId color,
+        public void Init(IArena board, CrowdRegistry registry, ICrowdContext game, int id, ColorId color,
                          NpcTraits traits, MeshRenderer body, LineRenderer line, Faller faller)
         {
             Registry = registry;
@@ -210,15 +212,15 @@ namespace Jam
 
         void CheckEdgeSlip(float dt)
         {
-            if (Faller == null || Game.slipCrowd <= 0) return;
+            if (Faller == null || Game.SlipCrowd <= 0) return;
 
-            if (Board.DistanceToEdge(transform.position) > Game.slipEdgeMargin)
+            if (Board.DistanceToEdge(transform.position) > Game.SlipEdgeMargin)
             {
                 _slipTimer = 0f;
                 return;
             }
 
-            int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, Game.slipRadius,
+            int n = Physics.OverlapSphereNonAlloc(transform.position + Vector3.up * 0.5f, Game.SlipRadius,
                                                   _neighbours, 1 << GameBootstrap.NpcLayer, QueryTriggerInteraction.Ignore);
 
             Vector3 push = Vector3.zero;
@@ -236,7 +238,7 @@ namespace Jam
                 counted++;
             }
 
-            if (counted < Game.slipCrowd) { _slipTimer = 0f; return; }
+            if (counted < Game.SlipCrowd) { _slipTimer = 0f; return; }
             if (push.sqrMagnitude < 0.01f) { _slipTimer = 0f; return; }
 
             Vector3 outward = transform.position - Board.PlatformCenter;
@@ -245,22 +247,22 @@ namespace Jam
             outward.Normalize();
 
             // The squeeze has to actually point at the void, otherwise this is just jostling.
-            if (Vector3.Dot(push.normalized, outward) < Game.slipOutwardDot) { _slipTimer = 0f; return; }
+            if (Vector3.Dot(push.normalized, outward) < Game.SlipOutwardDot) { _slipTimer = 0f; return; }
 
             _slipTimer += dt;
-            if (_slipTimer < Game.slipTime) return;
+            if (_slipTimer < Game.SlipTime) return;
 
             _slipTimer = 0f;
             ReleaseTarget();
             ReleaseOccupancy();
 
-            Faller.BeginFall(outward * Game.slipImpulse + Vector3.up * Game.slipHop);
+            Faller.BeginFall(outward * Game.SlipImpulse + Vector3.up * Game.SlipHop);
             Game.OnNpcFall(this);
         }
 
         void OnRespawned()
         {
-            var cell = Board.RandomInteriorCell(Game.npcRespawnMargin);
+            var cell = Board.RandomInteriorCell(Game.NpcRespawnMargin);
             var pos = Board.CellToWorld(cell);
             transform.SetPositionAndRotation(pos, Quaternion.identity);
 
@@ -382,7 +384,7 @@ namespace Jam
         {
             Claims++;
             ClaimedThisBeat = true;
-            _claimCooldown = Game.claimCooldown;
+            _claimCooldown = Game.ClaimCooldown;
             _lastClaimCell = cell;
             ReleaseTarget();
             Game.OnNpcClaim(this);
@@ -418,7 +420,7 @@ namespace Jam
         {
             if (_line == null) return;
 
-            bool on = Game.drawTargetLines && TargetCell.x >= 0;
+            bool on = Game.DrawTargetLines && TargetCell.x >= 0;
             _line.enabled = on;
             if (!on) return;
 
