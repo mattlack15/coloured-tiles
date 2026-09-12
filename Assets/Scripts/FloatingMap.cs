@@ -28,8 +28,8 @@ public class FloatingMap : MonoBehaviour, IArena
     [Min(0.01f)] public float fadeSeconds = 1;
 
     [Header("Tiles")]
-    [Tooltip("Lit tiles per participant. Below 1.0 there are fewer safe tiles than people, so somebody has to lose the scramble.")]
-    [Range(0.2f, 2f)] public float litTilesPerParticipant = 0.85f;
+    [Tooltip("Lit tiles per participant. Tiles can be shared, so this does NOT cap how many people can survive - what it controls is how far anyone has to travel and how hard the crowd converges on the few safe spots. At 0.3 with 61 participants, roughly 18 of the 49 tiles light up.")]
+    [Range(0.05f, 2f)] public float litTilesPerParticipant = 0.3f;
     [Tooltip("Floor on the lit tile count, so a solo player still gets a real choice.")]
     [Min(4)] public int minLitTiles = 8;
 

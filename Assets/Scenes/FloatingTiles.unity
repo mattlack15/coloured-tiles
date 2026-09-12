@@ -12696,7 +12696,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8d2d0c6f06dfd4c36a6d282fda3e9cd4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Jam.FloatingTilesCrowd
-  npcCount: 40
+  npcCount: 60
   bodyRadius: 0.32
   bodyHeight: 1.4
   speedMin: 4.6
@@ -12731,7 +12731,7 @@ MonoBehaviour:
   dropSeconds: 1
   resolveSeconds: 4
   fadeSeconds: 1
-  litTilesPerParticipant: 0.85
+  litTilesPerParticipant: 0.3
   minLitTiles: 8
   startingLives: 3
   spawnPoint: {fileID: 1290558886}

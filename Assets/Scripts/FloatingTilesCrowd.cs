@@ -19,8 +19,8 @@ namespace Jam
     public class FloatingTilesCrowd : MonoBehaviour, ICrowdContext
     {
         [Header("Crowd")]
-        [Tooltip("40 NPCs on a 49-tile board, plus the player, restores roughly the crowding of the old 5x5 arena.")]
-        public int npcCount = 40;
+        [Tooltip("60 NPCs plus the player is 61 participants. Together with a low litTilesPerParticipant this is what makes the crowd converge instead of spreading out.")]
+        public int npcCount = 60;
         public float bodyRadius = 0.32f;
         public float bodyHeight = 1.4f;
         [Tooltip("Deliberately close to the player's 6: the arena is only ~11 units across, so a big speed gap makes the crowd irrelevant.")]
