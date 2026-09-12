@@ -16,6 +16,19 @@ public class TestPlayer : MonoBehaviour
     public Vector3 Feet => Actor ? Actor.Feet : transform.position;
     void Awake()
     {
+        // The imported Bob mesh needs the same colour material as the original player.
+        // Outline meshes are created later and keep their separate white material.
+        var playerRenderer = GetComponent<Renderer>();
+        if (playerRenderer && playerRenderer.sharedMaterial)
+        {
+            foreach (var body in GetComponentsInChildren<MeshRenderer>())
+            {
+                if (body == playerRenderer) continue;
+                var materials = body.sharedMaterials;
+                for (int i = 0; i < materials.Length; i++) materials[i] = playerRenderer.sharedMaterial;
+                body.sharedMaterials = materials;
+            }
+        }
         Actor = GetComponent<TileActor>();
         if (!Actor) Actor = gameObject.AddComponent<TileActor>();
         Actor.DisplayName = "YOU";
